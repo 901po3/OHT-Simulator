@@ -30,6 +30,7 @@ namespace OHTSim.Visualization
         private void CreateEdgeLine(RailEdge edge)
         {
             var go = new GameObject($"Edge_{edge.From.Id}_{edge.To.Id}");
+            go.layer = gameObject.layer;
             go.transform.SetParent(transform);
 
             var lr = go.AddComponent<LineRenderer>();
@@ -60,6 +61,7 @@ namespace OHTSim.Visualization
 
             var go  = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.name = $"Node_{node.Id}";
+            go.layer = gameObject.layer;
             go.transform.SetParent(transform);
             go.transform.position   = ToWorld(node);
             go.transform.localScale = Vector3.one * size;

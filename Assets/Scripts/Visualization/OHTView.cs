@@ -19,6 +19,7 @@ namespace OHTSim.Visualization
         private OHTActor  _actor;
         private RailGraph _graph;
         private Renderer  _renderer;
+        private Renderer[] _renderers;
         private MaterialPropertyBlock _propBlock;
 
         public void Initialize(OHTActor actor, RailGraph graph)
@@ -26,6 +27,7 @@ namespace OHTSim.Visualization
             _actor    = actor;
             _graph    = graph;
             _renderer = GetComponent<Renderer>();
+            _renderers = GetComponentsInChildren<Renderer>();
             _propBlock = new MaterialPropertyBlock();
             name = actor.Id;
         }
@@ -69,7 +71,17 @@ namespace OHTSim.Visualization
             };
 
             _propBlock.SetColor("_BaseColor", c);
-            _renderer.SetPropertyBlock(_propBlock);
+            if (_renderers != null)
+            {
+                foreach (var r in _renderers)
+                {
+                    if (r != null) r.SetPropertyBlock(_propBlock);
+                }
+            }
+            else if (_renderer != null)
+            {
+                _renderer.SetPropertyBlock(_propBlock);
+            }
         }
 
         // Core 좌표 (X, Y) → Unity 월드 좌표 (X, 0.5, Y)
