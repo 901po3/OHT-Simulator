@@ -48,6 +48,7 @@ interface EditorState {
   removeEdge: (id: string) => void;
   undo: () => void;
   redo: () => void;
+  clearMap: () => void;
   saveToFile: () => void;
   loadFromData: (data: { nodes: EditorNode[]; edges: EditorEdge[] }) => void;
 }
@@ -239,6 +240,17 @@ export const useEditorStore = create<EditorState>()(persist((set, get) => ({
     a.click();
     // B-5 fix: 일부 브라우저에서 click() 직후 revoke 시 다운로드 실패
     setTimeout(() => URL.revokeObjectURL(url), 100);
+  },
+
+  clearMap() {
+    nodeSeq = 1;
+    edgeSeq = 1;
+    withHistory(get, set, {
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      tooltipPos: null,
+    });
   },
 
   loadFromData(data) {

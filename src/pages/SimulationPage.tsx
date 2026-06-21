@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSimRunStore, type StallReport } from '../store/simRunStore';
+import { useSimRunStore } from '../store/simRunStore';
 import { useEditorStore } from '../store/editorStore';
 import { ALGORITHM_META, type AlgorithmId } from '../core/pathfinding/algorithms';
 import { SimMapCanvas } from '../components/simulation/SimMapCanvas';

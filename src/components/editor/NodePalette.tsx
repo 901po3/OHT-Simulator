@@ -47,8 +47,63 @@ const divider: React.CSSProperties = {
   flexShrink: 0,
 };
 
+// 데드락 없는 자동 맵 생성
+// 레이아웃: 링 토폴로지 (4공정 노드 + Normal 중간점 + Depot 중앙) + 대각선 지름길
+function buildAutoMap(): { nodes: import('../../store/editorStore').EditorNode[]; edges: import('../../store/editorStore').EditorEdge[] } {
+  let nSeq = 1;
+  let eSeq = 1;
+  const n = (type: import('../../store/editorStore').NodeType, x: number, y: number) =>
+    ({ id: `node-${nSeq++}`, type, x, y });
+  const edge = (fromId: string, toId: string) =>
+    [{ id: `edge-${eSeq++}`, fromId, toId }, { id: `edge-${eSeq++}`, fromId: toId, toId: fromId }];
+
+  // 외곽 링: 공정 노드 4개 + 중간 Normal 4개
+  const dep   = n('Deposition', 160, 160);
+  const nTop  = n('Normal',     400,  90);
+  const exp   = n('Exposure',   640, 160);
+  const nRight= n('Normal',     720, 310);
+  const etch  = n('Etching',    640, 460);
+  const nBot  = n('Normal',     400, 530);
+  const clean = n('Cleaning',   160, 460);
+  const nLeft = n('Normal',      80, 310);
+  // 중앙 Depot + 4방향 연결 Normal
+  const depot = n('Depot',      400, 310);
+  const cTop  = n('Normal',     400, 200);
+  const cRight= n('Normal',     520, 310);
+  const cBot  = n('Normal',     400, 420);
+  const cLeft = n('Normal',     280, 310);
+
+  const nodes = [dep, nTop, exp, nRight, etch, nBot, clean, nLeft,
+                 depot, cTop, cRight, cBot, cLeft];
+
+  const edges = [
+    // 외곽 링 (양방향)
+    ...edge(dep.id,    nTop.id),
+    ...edge(nTop.id,   exp.id),
+    ...edge(exp.id,    nRight.id),
+    ...edge(nRight.id, etch.id),
+    ...edge(etch.id,   nBot.id),
+    ...edge(nBot.id,   clean.id),
+    ...edge(clean.id,  nLeft.id),
+    ...edge(nLeft.id,  dep.id),
+    // 중앙 십자 허브 (양방향 — 데드락 우회용)
+    ...edge(depot.id,  cTop.id),
+    ...edge(depot.id,  cRight.id),
+    ...edge(depot.id,  cBot.id),
+    ...edge(depot.id,  cLeft.id),
+    // 공정 노드 → 중앙 연결 (지름길)
+    ...edge(dep.id,   cLeft.id),
+    ...edge(exp.id,   cTop.id),
+    ...edge(etch.id,  cRight.id),
+    ...edge(clean.id, cBot.id),
+  ];
+
+  return { nodes, edges };
+}
+
 export function NodePalette() {
-  const { nodes, edges, connectType, setConnectType, saveToFile, loadFromData } = useEditorStore();
+  const { nodes, edges, connectType, setConnectType, saveToFile, loadFromData, clearMap } = useEditorStore();
+  const [confirmClear, setConfirmClear] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [mapName, setMapName] = useState('');
   const [savedMaps, setSavedMaps] = useState<SavedMap[]>([]);
@@ -196,6 +251,45 @@ export function NodePalette() {
             </div>
           );
         })}
+
+        <div style={divider} />
+
+        {/* 새로 만들기 / 자동 생성 */}
+        <div style={sectionLabel}>맵 작업</div>
+
+        {!confirmClear ? (
+          <button
+            onClick={() => setConfirmClear(true)}
+            style={{ ...btnBase, color: '#f85149', borderColor: '#f8514944' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#f8514922')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#21262d')}
+          >
+            <span>🗑</span> 새로 만들기
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              onClick={() => { clearMap(); setConfirmClear(false); }}
+              style={{ ...btnBase, flex: 1, background: '#f8514933', borderColor: '#f85149', color: '#f85149', justifyContent: 'center' }}
+            >확인</button>
+            <button
+              onClick={() => setConfirmClear(false)}
+              style={{ ...btnBase, flex: 1, justifyContent: 'center' }}
+            >취소</button>
+          </div>
+        )}
+
+        <button
+          onClick={() => { loadFromData(buildAutoMap()); }}
+          style={{ ...btnBase, color: '#3fb950', borderColor: '#3fb95044', background: '#3fb95011' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#3fb95033')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#3fb95011')}
+        >
+          <span>⚡</span> 자동 생성
+        </button>
+        <div style={{ fontSize: 10, color: '#444c56', lineHeight: 1.5 }}>
+          모든 공정 + 우회 경로 포함<br/>데드락 방지 링 토폴로지
+        </div>
 
         <div style={divider} />
 
