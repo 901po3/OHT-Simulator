@@ -1,6 +1,7 @@
 # OHT 시뮬레이터 — Unity 3D 핸드오프 문서
 
-> 기준 경로: `C:\Users\User\OneDrive\문서\react\OHT_System\Unity\3dSimulation`
+> 기준 경로: `C:\Unity\Portfolio\OHT-System\My project`
+> Git remote: `https://github.com/901po3/OHT-System.git`
 
 ---
 
@@ -10,15 +11,18 @@
 Assets/
   Scripts/
     Core/
-      OHTMapData.cs        — 데이터 모델 (NodeType, MapNode, MapEdge, OHTMapData)
+      OHTMapData.cs        — 데이터 모델 (NodeType, MapNode, MapEdge, OHTMapData, BuildAdjacency)
       MapXmlParser.cs      — XML → OHTMapData 파서
       MapBuilder.cs        — OHTMapData → 3D GameObject 생성
       MapLoaderService.cs  — StreamingAssets/Maps/ 로드 오케스트레이터
+      PathfindingBridge.cs — TypeScript algorithms.ts의 C# 포트 (6가지 알고리즘)
     Simulation/
       SimulationController.cs — 시뮬레이션 상태 기계 (WaitingForMap→Ready→Running)
+      AgentController.cs      — 3D 에이전트 생성·이동·공정 순환 (PathfindingBridge 사용)
     UI/
       MapSelectorUI.cs     — 플레이 모드 진입 시 맵 선택 전체화면 패널
       StartSimButtonUI.cs  — 상단 중앙 대형 시작/중지 버튼
+      SimOverlayUI.cs      — 시뮬레이션 진행 중 HUD (처리 완료, 처리량, 경과 시간)
   StreamingAssets/
     Maps/                  — 웹 에디터에서 내보낸 .xml 파일 저장 위치
 ```
@@ -81,6 +85,40 @@ NodeType 값: `Normal` | `Deposition` | `Exposure` | `Etching` | `Cleaning` | `D
   4. 재클릭 → `SimulationController.StopSimulation()`
 - **Unity 씬 설정**: Canvas > Button (button) + Text (label), Inspector에서 simController 연결
 
+### E-4 PathfindingBridge — TypeScript 알고리즘 C# 포트
+
+- **구현 파일**: `Assets/Scripts/Core/PathfindingBridge.cs`
+- **동작**: `FindPath(AlgorithmId, from, to, map, congestion, reservations?, noise?)` → `List<MapNode>`
+- **AlgorithmId**: Standard, Dijkstra, Greedy, Stochastic, Priority, CbsLite
+- **전제 조건**: `OHTMapData.BuildAdjacency()` 호출 후 사용 (MapLoaderService에서 자동 호출)
+- **Priority A***: `costMul = 1 + congestion * 2.5`
+- **CBS-Lite**: 예약 노드 패널티 8f 적용
+
+### E-5 AgentController — 3D 에이전트 이동
+
+- **구현 파일**: `Assets/Scripts/Simulation/AgentController.cs`
+- **동작**:
+  1. `SimulationController.OnSimulationStarted` 구독 → `SpawnAgents(map)` 호출
+  2. Depot 노드(없으면 첫 번째 노드)에서 에이전트 스폰
+  3. `AgentLoop` 코루틴: 공정 노드 순환 (Deposition → Exposure → Etching → Cleaning) 반복
+  4. 각 이동 구간: `PathfindingBridge.FindPath(Priority)` → 노드 간 `MoveTowards`
+  5. 공정 처리 후 `OnJobCompleted` 이벤트 발생
+- **Inspector 설정**: agentPrefab (null이면 Capsule 자동), agentCount, moveSpeed, loaderService, mapBuilder
+- **이벤트**: `public event Action OnJobCompleted` — SimOverlayUI가 구독
+
+### E-6 SimOverlayUI — 시뮬레이션 HUD
+
+- **구현 파일**: `Assets/Scripts/UI/SimOverlayUI.cs`
+- **동작**:
+  - `SimulationController.OnSimulationStarted` → 패널 활성화, 카운터 초기화
+  - `AgentController.OnJobCompleted` 구독 → `_completedJobs++`
+  - 0.5초마다 업데이트: 처리 완료 수 / 처리량(job/min) / 경과 시간(mm:ss)
+  - `SimulationController.OnSimulationStopped` → 패널 비활성화
+- **Unity 씬 설정**:
+  - Canvas > Panel (panelRoot, 하단 또는 우측 고정)
+  - Text × 3: labelCompleted / labelThroughput / labelElapsed
+  - Inspector에서 simController, agentController 연결
+
 ---
 
 ## Unity 씬 조립 순서
@@ -91,13 +129,17 @@ NodeType 값: `Normal` | `Deposition` | `Exposure` | `Etching` | `Cleaning` | `D
    - `MapBuilder` Inspector에서 nodePrefab 연결 (없으면 Sphere 자동 생성)
 3. **빈 GameObject** `[SimController]` 생성:
    - `SimulationController` 컴포넌트 부착
-   - loaderService 필드에 `[Services]` 연결
+   - `AgentController` 컴포넌트 부착 (RequireComponent로 자동)
+   - loaderService, mapBuilder 필드에 `[Services]` 연결
 4. **UI Canvas** (Screen Space - Overlay) 생성:
    - **MapSelectorUI 패널** — 전체화면 Panel, ScrollView, Button 프리팹, Text
    - **StartSimButton** — 상단 중앙 Button (폰트 크기 28+, 너비 320px)
-5. MapSelectorUI Inspector: loaderService / simController 연결
-6. StartSimButtonUI Inspector: simController 연결
-7. **재생 버튼** → 맵 선택 패널 자동 표시
+   - **SimOverlay 패널** — 하단 또는 우측 반투명 패널, Text × 3
+5. Inspector 연결:
+   - MapSelectorUI: loaderService / simController
+   - StartSimButtonUI: simController
+   - SimOverlayUI: simController / agentController
+6. **재생 버튼** → 맵 선택 패널 자동 표시
 
 ---
 
@@ -109,8 +151,13 @@ NodeType 값: `Normal` | `Deposition` | `Exposure` | `Etching` | `Cleaning` | `D
 
 ---
 
-## 미구현 (다음 세션)
+## 알고리즘 대응표 (TypeScript ↔ C#)
 
-- `AgentController.cs` — 에이전트 3D 이동 (SimulationController.OnSimulationStarted 구독)
-- `PathfindingBridge.cs` — 웹 BFS/CBS 알고리즘의 C# 포팅
-- `SimOverlayUI.cs` — 진행 중 통계 (처리 완료 수, 처리량) HUD
+| AlgorithmId | TypeScript 함수 | 특징 |
+|---|---|---|
+| Standard | `findPathStandard` | 기본 A* (휴리스틱 + 가중치) |
+| Dijkstra | `findPathDijkstra` | 다익스트라 (휴리스틱 0) |
+| Greedy | `findPathGreedy` | 탐욕 BFS (g-cost 0) |
+| Stochastic | `findPathStochastic` | A* + 노이즈 탐색 |
+| Priority | `findPathPriority` | A* + 혼잡도 가중치 (costMul = 1 + cong × 2.5) |
+| CbsLite | `findPathCbsLite` | CBS-Lite, 예약 테이블 패널티 |

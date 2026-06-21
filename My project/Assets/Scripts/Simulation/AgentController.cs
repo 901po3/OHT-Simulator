@@ -20,6 +20,9 @@ namespace OHTSim.Simulation
         public MapLoaderService loaderService;
         public MapBuilder mapBuilder;
 
+        // SimOverlayUI 등이 구독 — 에이전트가 공정 노드 처리를 완료할 때마다 발생
+        public event System.Action OnJobCompleted;
+
         SimulationController _sim;
         readonly List<AgentInstance> _agents = new();
 
@@ -124,6 +127,7 @@ namespace OHTSim.Simulation
 
                 // 공정 처리 대기 (타입별 시간)
                 yield return new WaitForSeconds(ProcessTime(target.type));
+                OnJobCompleted?.Invoke();
             }
         }
 
