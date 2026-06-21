@@ -20,7 +20,7 @@ export function SimulationPage() {
   const { nodes, edges } = useEditorStore();
   const {
     running, algorithmId, agentCount, speed, stats, autoDispatch, agents,
-    stallReport,
+    stallReport, overcrowdWarning,
     startSim, stopSim, setAlgorithm, setAgentCount, setSpeed, setAutoDispatch, tick,
     dismissStallReport,
   } = useSimRunStore();
@@ -76,6 +76,18 @@ export function SimulationPage() {
           onDismiss={dismissStallReport}
           onGoToEditor={() => { stopSim(); navigate('/editor'); }}
         />
+      )}
+
+      {/* ── 과잉 투입 경고 배너 ── */}
+      {overcrowdWarning && (
+        <div style={{
+          background: '#d297001a', borderBottom: '1px solid #d2970066',
+          padding: '6px 14px', fontSize: 11, color: '#d29700',
+          display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 14 }}>⚠</span>
+          <span>{overcrowdWarning}</span>
+        </div>
       )}
 
       {/* ── 상단 컨트롤 바 ── */}
@@ -264,8 +276,8 @@ export function SimulationPage() {
                     {a.state}
                   </span>
                 </div>
-                <div style={{ fontSize: 10, color: '#58a6ff', marginTop: 3 }}>
-                  다음: {PROCESS_CYCLE[a.processStage % 4]} 공정
+                <div style={{ fontSize: 10, color: a.recalling ? '#f85149' : '#58a6ff', marginTop: 3 }}>
+                  {a.recalling ? '↩ 차고지 귀환 중' : `다음: ${PROCESS_CYCLE[a.processStage % 4]} 공정`}
                 </div>
                 <div style={{ fontSize: 9, color: '#444c56', marginTop: 1 }}>
                   이동 {a.totalDistance}칸 · 완료 {a.totalJobs}건

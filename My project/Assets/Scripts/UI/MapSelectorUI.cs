@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using OHTSim.Core;
+using OHTSim.Simulation;
 
 namespace OHTSim.UI
 {

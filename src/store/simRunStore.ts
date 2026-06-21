@@ -52,6 +52,7 @@ export interface SimAgent {
   totalDistance: number;
   totalJobs: number;
   blockedSec: number; // Moving 중 차단된 누적 시간 → 재경로 탐색 트리거
+  recalling: boolean; // 차고지 귀환 중 — 도착 시 제거
 }
 
 // ── 스톨 리포트 ────────────────────────────────────────
@@ -251,6 +252,7 @@ interface SimRunState {
   congestion: Map<string, number>;
   stallReport: StallReport | null;
   stallSinceSec: number; // 마지막 completedJobs 이후 초
+  overcrowdWarning: string | null; // 로봇 과잉 투입 경고
 
   startSim: (eNodes: EditorNode[], eEdges: EditorEdge[]) => void;
   stopSim: () => void;
@@ -277,6 +279,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
   congestion: new Map(),
   stallReport: null,
   stallSinceSec: 0,
+  overcrowdWarning: null,
 
   startSim(eNodes, eEdges) {
     const graph = buildRuntimeGraph(eNodes, eEdges);
@@ -289,34 +292,25 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
 
     let agents: SimAgent[] = [];
     const { agentCount } = get();
+
+    const mkAgent = (node: RailNode, seq: number): SimAgent => ({
+      id: `OHT-${seq}`, color: COLORS[(seq - 1) % COLORS.length],
+      currentNode: node, nextNode: null, path: [], pathIndex: 0, progress: 0,
+      state: 'Idle', stateTimer: 0, processStage: 0,
+      totalDistance: 0, totalJobs: 0, blockedSec: 0, recalling: false,
+    });
+
     if (depots.length === 0) {
-      agents = Array.from({ length: Math.min(agentCount, allNodes.length) }, (_, i) => ({
-        id: `OHT-${i + 1}`,
-        color: COLORS[i % COLORS.length],
-        currentNode: allNodes[i % allNodes.length],
-        nextNode: null,
-        path: [],
-        pathIndex: 0,
-        progress: 0,
-        state: 'Idle' as AgentState,
-        stateTimer: 0,
-        processStage: 0,
-        totalDistance: 0,
-        totalJobs: 0,
-        blockedSec: 0,
-      }));
+      agents = Array.from({ length: Math.min(agentCount, allNodes.length) }, (_, i) =>
+        mkAgent(allNodes[i % allNodes.length], i + 1)
+      );
     }
 
     set({
-      running: true,
-      graph,
-      allNodes,
-      agents,
-      agentSeq: agents.length + 1,
-      spawnTimers,
-      congestion: new Map(),
-      stallReport: null,
-      stallSinceSec: 0,
+      running: true, graph, allNodes, agents,
+      agentSeq: agents.length + 1, spawnTimers,
+      congestion: new Map(), stallReport: null, stallSinceSec: 0,
+      overcrowdWarning: null,
       stats: { completedJobs: 0, totalDistance: 0, elapsedSec: 0, distPerSec: 0 },
     });
   },
@@ -324,12 +318,32 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
   stopSim() {
     set({
       running: false, agents: [], spawnTimers: new Map(),
-      agentSeq: 1, stallReport: null, stallSinceSec: 0,
+      agentSeq: 1, stallReport: null, stallSinceSec: 0, overcrowdWarning: null,
     });
   },
 
   setAlgorithm: (id) => set({ algorithmId: id }),
-  setAgentCount: (n) => set({ agentCount: n }),
+
+  setAgentCount(n) {
+    const { agents, allNodes } = get();
+    const depots = allNodes.filter(nd => nd.type === 'Depot');
+    const active = agents.filter(a => !a.recalling);
+    const excess = active.length - n;
+
+    if (excess > 0) {
+      // 가장 가까운 차고지 순으로 초과분 귀환 지정
+      const scored = active.map(a => {
+        const dist = depots.length > 0
+          ? Math.min(...depots.map(d => Math.abs(a.currentNode.x - d.x) + Math.abs(a.currentNode.y - d.y)))
+          : 0;
+        return { id: a.id, dist };
+      }).sort((x, y) => x.dist - y.dist);
+      const recallSet = new Set(scored.slice(0, excess).map(s => s.id));
+      set({ agentCount: n, agents: agents.map(a => recallSet.has(a.id) ? { ...a, recalling: true } : a) });
+    } else {
+      set({ agentCount: n });
+    }
+  },
   setSpeed: (s) => set({ speed: s }),
   setAutoDispatch: (v) => set({ autoDispatch: v }),
   dismissStallReport: () => set({ stallReport: null, stallSinceSec: 0 }),
@@ -369,7 +383,8 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
 
     for (const depot of depots) {
       const elapsed = (newSpawnTimers.get(depot.id) ?? 0) + dt;
-      if (elapsed >= SPAWN_INTERVAL && newAgents.length < agentCount) {
+      const activeCount = newAgents.filter(a => !a.recalling).length;
+      if (elapsed >= SPAWN_INTERVAL && activeCount < agentCount) {
         const occupiedDepot = newAgents.some(
           a => a.currentNode.id === depot.id || a.nextNode?.id === depot.id
         );
@@ -389,6 +404,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
             totalDistance: 0,
             totalJobs: 0,
             blockedSec: 0,
+            recalling: false,
           });
           newSpawnTimers.set(depot.id, elapsed - SPAWN_INTERVAL);
         } else {
@@ -415,6 +431,26 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       // ── Idle ──────────────────────────────────────────
       if (agent.state === 'Idle') {
         agent.blockedSec = 0;
+
+        // 귀환 모드: 가장 가까운 차고지로 이동 후 제거
+        if (agent.recalling) {
+          if (depots.length === 0 || depots.some(d => d.id === agent.currentNode.id)) {
+            // 차고지 도착 (또는 차고지 없음) → 제거 플래그 (루프 후 필터링)
+            agent.stateTimer = 0;
+            continue;
+          }
+          const nearestDepot = depots.reduce((best, d) =>
+            (Math.abs(agent.currentNode.x - d.x) + Math.abs(agent.currentNode.y - d.y)) <
+            (Math.abs(agent.currentNode.x - best.x) + Math.abs(agent.currentNode.y - best.y)) ? d : best
+          );
+          const path = findPath(agent.currentNode, nearestDepot, algorithmId, newCong, newReservations);
+          if (path.length > 1) {
+            agent.path = path; agent.pathIndex = 0;
+            agent.state = 'Moving'; agent.stateTimer = 0; agent.blockedSec = 0;
+          }
+          continue;
+        }
+
         const target = getNextTarget(agent, allNodes, autoDispatch);
         if (!target) {
           agent.stateTimer = 0;
@@ -517,6 +553,21 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       }
     }
 
+    // 귀환 완료 에이전트 제거 (차고지 도착 후 Idle 상태인 recalling 에이전트)
+    const finalAgents = newAgents.filter(a =>
+      !(a.recalling && a.state === 'Idle' &&
+        (depots.length === 0 || depots.some(d => d.id === a.currentNode.id)))
+    );
+
+    // 과잉 투입 경고 — 공정 노드 수 대비 로봇이 너무 많고 대기 비율이 높을 때
+    const processNodeCount = allNodes.filter(n => PROCESS_CYCLE.includes(n.type as typeof PROCESS_CYCLE[number])).length;
+    const activeAgents = finalAgents.filter(a => !a.recalling);
+    const blockedCount = activeAgents.filter(a => a.blockedSec > 0.5 || a.state === 'Idle').length;
+    const blockedRatio = activeAgents.length > 0 ? blockedCount / activeAgents.length : 0;
+    const newOvercrowd = (processNodeCount > 0 && activeAgents.length > processNodeCount * 1.5 && blockedRatio > 0.5)
+      ? `로봇 ${activeAgents.length}대 중 ${Math.round(blockedRatio * 100)}%가 대기 중 — 공정 노드 ${processNodeCount}개 대비 로봇이 과다 투입되어 비용 낭비 중입니다. 최대 로봇 수를 ${processNodeCount * 2} 이하로 줄이세요.`
+      : null;
+
     // 스톨 감지 — 완료 없이 STALL_THRESHOLD_SEC 초 경과
     const elapsed     = stats.elapsedSec + dt;
     const totalDist   = stats.totalDistance + distDelta;
@@ -538,12 +589,13 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
     }
 
     set({
-      agents: newAgents,
+      agents: finalAgents,
       agentSeq: nextSeq,
       spawnTimers: newSpawnTimers,
       congestion: newCong,
       stallReport: newStallRpt,
       stallSinceSec: newStallSec,
+      overcrowdWarning: newOvercrowd,
       stats: {
         completedJobs: stats.completedJobs + completedDelta,
         totalDistance: totalDist,
