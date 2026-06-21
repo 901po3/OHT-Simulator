@@ -189,6 +189,16 @@ const TECHNIQUES = [
     code: 'if (blockedSec >= 2.0) → back to Idle',
   },
   {
+    icon: '🗺',
+    title: 'plannedCong — 동일 틱 경로 분산',
+    category: '경로 분산',
+    color: '#bc8cff',
+    problem: '같은 틱 안에 여러 Idle 에이전트가 경로를 탐색할 때, 먼저 경로를 잡은 에이전트의 선택이 다음 에이전트에게 반영되지 않아 모두 같은 최단 경로를 선택',
+    solution: '매 틱 시작 시 실제 혼잡도 맵(newCong)의 얕은 복사본(plannedCong)을 생성. Idle 에이전트가 경로를 확정할 때마다 그 경로 노드에 +0.35 가중치를 누적 적용. 다음 에이전트는 이미 선점된 경로가 비싸 보여 자연스럽게 대안 경로를 선택.',
+    result: '동일 틱 내 경로 쏠림 방지. 그리드 맵에서 여러 등가 경로로 로봇 자연 분산. newCong 원본은 오염되지 않아 실제 혼잡도 통계·과잉 경고 로직에 영향 없음.',
+    code: 'plannedCong = new Map(newCong) each tick',
+  },
+  {
     icon: '🚗',
     title: 'TryPhysicalYield (L3 — 물리적 공간 양보)',
     category: '데드락 해소',
@@ -498,12 +508,13 @@ function CurrentAlgoExplain() {
         <div style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.85, marginBottom: 16 }}>
           <strong style={{ color: '#58a6ff' }}>WHCA* (Windowed Hierarchical Cooperative A*)</strong>는
           시공간 예약 테이블을 통해 미래 충돌을 사전에 차단합니다. 각 에이전트가 앞으로 이동할
-          <strong style={{ color: '#e6edf3' }}> 12스텝</strong>을 예약하고, 후순위 에이전트가 해당 셀을
+          <strong style={{ color: '#e6edf3' }}> 8스텝</strong>을 예약하고, 후순위 에이전트가 해당 셀을
           탐색할 때 <strong style={{ color: '#ffa657' }}>×8 비용 페널티</strong>를 받아 자동으로 우회합니다.
+          (그리드 맵 대응으로 기존 5스텝에서 8스텝으로 확장. 경로가 길어질수록 더 넓은 충돌 사전 차단 범위 확보)
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
-            { label: '예약 윈도우', value: '12 스텝', color: '#58a6ff' },
+            { label: '예약 윈도우', value: '8 스텝', color: '#58a6ff' },
             { label: '예약 페널티', value: '× 8 비용', color: '#ffa657' },
             { label: 'A* 호출 감소', value: '80%', color: '#3fb950' },
           ].map(({ label, value, color }) => (
@@ -521,7 +532,7 @@ function CurrentAlgoExplain() {
           {[
             { step: '① 혼잡도 맵 수집', desc: 'TrafficController가 모든 에이전트 위치 집계 → 노드별 혼잡도(0~1) 계산', color: '#58a6ff' },
             { step: '② Priority A* 경로 탐색', desc: '혼잡 노드 회피하며 초기 경로 결정. 에이전트 간 자연스러운 분산 발생', color: '#3fb950' },
-            { step: '③ WHCA* 예약 등록', desc: '확정된 경로의 12스텝을 시공간 테이블에 등록', color: '#ffa657' },
+            { step: '③ WHCA* 예약 등록', desc: '확정된 경로의 8스텝을 시공간 테이블에 등록 (CBS_LOOKAHEAD)', color: '#ffa657' },
             { step: '④ 후순위 에이전트 우회', desc: '다음 에이전트 탐색 시 예약 노드 ×8 페널티 적용 → 자동 우회', color: '#bc8cff' },
             { step: '⑤ PathCommitmentSteps', desc: '5스텝마다 재탐색 — 잦은 재계산 없이 변화에 적응', color: '#e8912d' },
           ].map(({ step, desc, color }) => (
