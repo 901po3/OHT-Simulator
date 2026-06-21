@@ -122,28 +122,33 @@ function buildGrid(
 }
 
 // 프리셋 2: 중형 — 4×5 그리드 (20노드, 공정 2×4)
-// 공정 노드가 대각선으로 분산 → 어떤 두 노드 사이에도 복수의 동등한 경로 존재
+// ⚠ 구 버전: (0,0) 코너 증착 + (0,2) 엣지 노광 → 상단 행 단일 경로 병목
+// 개선: 공정 노드를 코너 회피 위치로 이동, 각 연속 공정 쌍 사이 경로 2개 이상 보장
+//   (0,1)Dep ↔ (0,3)Exp: 상단 행 경로 + row1 우회 경로
+//   (3,3)Dep ↔ (3,1)Exp: 행 내 직선 + row4 우회 경로
 function buildMediumMap(): MapData {
   return buildGrid(4, 5, 100, 185, 75, 125, {
-    '0,0': 'Deposition', '0,2': 'Exposure',
-    '1,3': 'Etching',
-    '2,0': 'Cleaning',   '2,2': 'Depot',
-    '3,1': 'Deposition', '3,3': 'Exposure',
-    '4,0': 'Etching',    '4,2': 'Cleaning',
+    '0,1': 'Deposition', '0,3': 'Exposure',
+    '2,0': 'Cleaning',   '2,2': 'Depot',   '2,3': 'Etching',
+    '3,1': 'Exposure',   '3,3': 'Deposition',
+    '4,1': 'Etching',    '4,2': 'Cleaning',
   });
 }
 
 // 프리셋 3: 대형 — 5×6 그리드 (30노드, 공정 3×4, Depot 2)
-// 공정 노드가 체스판처럼 분산 → 로봇들이 자연스럽게 여러 경로로 퍼짐
-// Depot 2개(중앙 + 우하단)로 스폰 부하 분산 → 귀환 경로 포화 방지
+// ⚠ 구 버전: (0,0) 코너 증착 + (0,2) 엣지 노광 → 단일 경로 막힘 보고됨
+// 개선: 코너 노드 제거, 공정 노드 내부/엣지(비코너) 분산
+//   (0,1)Dep ↔ (0,3)Exp: 상단 행 + row1 우회 — 최소 2개 경로
+//   (3,3)Dep ↔ (3,1)Exp: 행 내 직선 + row4 우회 — 최소 2개 경로
+// Depot 2개: (2,2) 중앙 / (4,4) 우측 → 스폰 부하 분산
 function buildLargeMap(): MapData {
   return buildGrid(5, 6, 80, 145, 65, 110, {
-    '0,0': 'Deposition', '0,2': 'Exposure',
+    '0,1': 'Deposition', '0,3': 'Exposure',
     '1,4': 'Etching',
-    '2,0': 'Cleaning',   '2,2': 'Depot',   '2,4': 'Exposure',
-    '3,1': 'Deposition', '3,3': 'Cleaning',
-    '4,0': 'Exposure',                      '4,4': 'Etching',
-    '5,1': 'Etching',    '5,2': 'Cleaning', '5,3': 'Deposition', '5,4': 'Depot',
+    '2,0': 'Cleaning',   '2,2': 'Depot',
+    '3,1': 'Exposure',   '3,3': 'Deposition',
+    '4,0': 'Etching',    '4,2': 'Cleaning',   '4,4': 'Depot',
+    '5,1': 'Deposition', '5,2': 'Exposure',   '5,3': 'Etching', '5,4': 'Cleaning',
   });
 }
 
@@ -339,7 +344,7 @@ export function NodePalette() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
             {([
               { label: '소형', sub: '공정 1×4 · 13노드', fn: buildSmallMap,  color: '#58a6ff' },
-              { label: '중형', sub: '공정 2×4 · 18노드', fn: buildMediumMap, color: '#ffa657' },
+              { label: '중형', sub: '공정 2×4 · 20노드', fn: buildMediumMap, color: '#ffa657' },
               { label: '대형', sub: '공정 3×4 · 30노드', fn: buildLargeMap,  color: '#bc8cff' },
             ] as const).map(({ label, sub, fn, color }) => (
               <button
