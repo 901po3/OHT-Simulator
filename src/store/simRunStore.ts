@@ -35,6 +35,14 @@ const STALL_THRESHOLD_SEC = 5;
 // 이동 중 블록 지속 시 재경로 탐색 임계 (초)
 const REPATH_THRESHOLD_SEC = 2.0;
 
+// ── 경로 분산 상수 ─────────────────────────────────────
+// plannedCong 누적 가중치: 이번 tick에 경로를 잡는 에이전트끼리 동일 경로를 회피하도록 유도
+// cong=1.0 도달 시 Priority A*의 costMul은 1 + 1.0×2.5 = 3.5 (통행 불가가 아닌 고비용)
+// → 경로는 항상 존재하므로 포화 시 데드락이 아닌 비효율 우회로 그치며 안전
+const PLANNED_CONG_BUMP        = 0.35 as const; // 일반 경로 누적치 — 약 3회 중복 시 포화
+const PLANNED_CONG_RECALL_BUMP = 0.30 as const; // 귀환 경로 누적치 (일반보다 약하게)
+const CBS_LOOKAHEAD            = 8    as const; // CBS 예약 테이블 lookahead 노드 수 (기존 5 → 넓은 그리드 맵 대응)
+
 // ── 에이전트 ───────────────────────────────────────────
 export type AgentState = 'Idle' | 'Moving' | 'Processing';
 
@@ -371,11 +379,15 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
     const newReservations = new Map<string, number>();
     for (const a of newAgents) {
       if (a.state === 'Moving') {
-        a.path.slice(a.pathIndex, a.pathIndex + 5).forEach((n, i) => {
+        a.path.slice(a.pathIndex, a.pathIndex + CBS_LOOKAHEAD).forEach((n, i) => {
           if (!newReservations.has(n.id)) newReservations.set(n.id, i);
         });
       }
     }
+
+    // 계획 혼잡도 — 이번 tick에 새로 경로를 잡는 에이전트끼리 같은 경로 회피
+    // Idle → Moving 전환 시마다 경로 노드를 누적해 다음 에이전트가 다른 경로를 선택하도록 유도
+    const plannedCong = new Map(newCong);
 
     // 차고지 스폰
     const depots = allNodes.filter(n => n.type === 'Depot');
@@ -443,10 +455,12 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
             (Math.abs(agent.currentNode.x - d.x) + Math.abs(agent.currentNode.y - d.y)) <
             (Math.abs(agent.currentNode.x - best.x) + Math.abs(agent.currentNode.y - best.y)) ? d : best
           );
-          const path = findPath(agent.currentNode, nearestDepot, algorithmId, newCong, newReservations);
+          const path = findPath(agent.currentNode, nearestDepot, algorithmId, plannedCong, newReservations);
           if (path.length > 1) {
             agent.path = path; agent.pathIndex = 0;
             agent.state = 'Moving'; agent.stateTimer = 0; agent.blockedSec = 0;
+            // 귀환 경로도 계획 혼잡도에 반영
+            path.slice(1).forEach(n => plannedCong.set(n.id, Math.min((plannedCong.get(n.id) ?? 0) + PLANNED_CONG_RECALL_BUMP, 1)));
           }
           continue;
         }
@@ -461,8 +475,10 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
           agent.stateTimer = 0;
           continue;
         }
-        const path = findPath(agent.currentNode, target, algorithmId, newCong, newReservations);
+        const path = findPath(agent.currentNode, target, algorithmId, plannedCong, newReservations);
         if (path.length > 0) {
+          // 계획 혼잡도 누적: 이 에이전트의 경로 노드를 비싸게 만들어 다음 에이전트가 분산되도록 유도
+          path.slice(1).forEach(n => plannedCong.set(n.id, Math.min((plannedCong.get(n.id) ?? 0) + PLANNED_CONG_BUMP, 1)));
           agent.path      = path;
           agent.pathIndex = 0;
           agent.state     = 'Moving';

@@ -86,116 +86,65 @@ function buildSmallMap(): MapData {
   };
 }
 
-// 프리셋 2: 중형 (2x 공정, 21노드) — 이중 링
-function buildMediumMap(): MapData {
-  const { n, bi } = makeMapBuilder();
-  // 외곽 16각형 링 (공정 2x4 + Normal 8)
-  const dep1  = n('Deposition', 100, 150);
-  const nO1   = n('Normal',     300,  60);
-  const exp1  = n('Exposure',   500,  60);
-  const nO2   = n('Normal',     700, 150);
-  const etch1 = n('Etching',    760, 330);
-  const nO3   = n('Normal',     700, 510);
-  const cln1  = n('Cleaning',   500, 580);
-  const nO4   = n('Normal',     300, 580);
-  const dep2  = n('Deposition', 100, 510);
-  const nO5   = n('Normal',      40, 330);
-  const exp2  = n('Exposure',   100, 150); // 실제로 dep1과 같은 위치 피하기 위해 조정
-  // 외곽 링은 dep1→nO1→exp1→nO2→etch1→nO3→cln1→nO4→dep2→nO5→(back to dep1)
-  // exp2, etch2, cln2 를 내부 링에 배치
-  const etch2 = n('Etching',    560, 200);
-  const cln2  = n('Cleaning',   560, 420);
-  const exp2r = n('Exposure',   240, 420);
-  // 중앙 허브
-  const depot = n('Depot',      400, 310);
-  const cT    = n('Normal',     400, 200);
-  const cR    = n('Normal',     520, 310);
-  const cB    = n('Normal',     400, 420);
-  const cL    = n('Normal',     280, 310);
-
-  // dep2와 exp2의 위치가 겹치므로 exp2r을 별도 위치로 수정 (이미 위에서 exp2r로)
-  return {
-    nodes: [dep1, nO1, exp1, nO2, etch1, nO3, cln1, nO4, dep2, nO5, etch2, cln2, exp2r, depot, cT, cR, cB, cL],
-    edges: [
-      // 외곽 링
-      ...bi(dep1.id, nO1.id), ...bi(nO1.id, exp1.id), ...bi(exp1.id, nO2.id), ...bi(nO2.id, etch1.id),
-      ...bi(etch1.id, nO3.id), ...bi(nO3.id, cln1.id), ...bi(cln1.id, nO4.id), ...bi(nO4.id, dep2.id),
-      ...bi(dep2.id, nO5.id), ...bi(nO5.id, dep1.id),
-      // 중앙 허브
-      ...bi(depot.id, cT.id), ...bi(depot.id, cR.id), ...bi(depot.id, cB.id), ...bi(depot.id, cL.id),
-      // 내부 공정 노드 ↔ 허브
-      ...bi(etch2.id, cT.id), ...bi(etch2.id, cR.id),
-      ...bi(cln2.id, cR.id), ...bi(cln2.id, cB.id),
-      ...bi(exp2r.id, cL.id), ...bi(exp2r.id, cB.id),
-      // 외곽 ↔ 허브 지름길
-      ...bi(dep1.id, cL.id), ...bi(exp1.id, cT.id),
-      ...bi(etch1.id, cR.id), ...bi(cln1.id, cB.id),
-      // 외곽 ↔ 내부 연결
-      ...bi(etch2.id, exp1.id), ...bi(cln2.id, cln1.id), ...bi(exp2r.id, dep2.id),
-    ],
-  };
+// 그리드 맵 빌더 — 각 노드가 상하좌우 이웃과 모두 연결된 메시 구조
+// 로봇이 점유된 경로를 피해 자연스럽게 분산되는 것을 지원
+//
+// ⚠ 사용 전제: loadFromData()로 에디터 상태를 전체 교체(replace)할 때만 안전
+// nSeq/eSeq가 호출마다 1부터 재시작하므로 기존 그래프와 병합하면 id 충돌이 발생함
+function buildGrid(
+  cols: number, rows: number,
+  x0: number, dx: number,
+  y0: number, dy: number,
+  typeMap: Partial<Record<string, NT>>,
+): MapData {
+  let nSeq = 1; let eSeq = 1;
+  type GN = { id: string; type: NT; x: number; y: number };
+  const grid: GN[][] = Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => ({
+      id: `node-${nSeq++}`,
+      type: (typeMap[`${r},${c}`] ?? 'Normal') as NT,
+      x: x0 + c * dx,
+      y: y0 + r * dy,
+    }))
+  );
+  const edges: { id: string; fromId: string; toId: string }[] = [];
+  const bi = (a: string, b: string) => [
+    { id: `edge-${eSeq++}`, fromId: a, toId: b },
+    { id: `edge-${eSeq++}`, fromId: b, toId: a },
+  ];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (c + 1 < cols) edges.push(...bi(grid[r][c].id, grid[r][c + 1].id));
+      if (r + 1 < rows) edges.push(...bi(grid[r][c].id, grid[r + 1][c].id));
+    }
+  }
+  return { nodes: grid.flat(), edges };
 }
 
-// 프리셋 3: 대형 (3x 공정, 28노드) — 삼중 링
-function buildLargeMap(): MapData {
-  const { n, bi } = makeMapBuilder();
-  // 외곽 링 (2x 공정 + Normal)
-  const dep1  = n('Deposition',  80, 140);
-  const nO1   = n('Normal',     280,  50);
-  const exp1  = n('Exposure',   500,  50);
-  const nO2   = n('Normal',     720, 140);
-  const etch1 = n('Etching',    800, 330);
-  const nO3   = n('Normal',     720, 520);
-  const cln1  = n('Cleaning',   500, 600);
-  const nO4   = n('Normal',     280, 600);
-  const dep2  = n('Deposition',  80, 520);
-  const nO5   = n('Normal',      20, 330);
-  // 중간 링 (2x 공정)
-  const exp2  = n('Exposure',   600, 170);
-  const etch2 = n('Etching',    680, 420);
-  const cln2  = n('Cleaning',   200, 420);
-  const dep3  = n('Deposition', 200, 170);
-  // 내부 링 (3번째 공정 세트)
-  const exp3  = n('Exposure',   500, 220);
-  const etch3 = n('Etching',    560, 390);
-  const cln3  = n('Cleaning',   260, 390);
-  const dep3b = n('Deposition', 300, 220);
-  // 중앙 허브
-  const depot = n('Depot',      400, 310);
-  const cT    = n('Normal',     400, 210);
-  const cR    = n('Normal',     520, 310);
-  const cB    = n('Normal',     400, 410);
-  const cL    = n('Normal',     280, 310);
-  const cTR   = n('Normal',     480, 240);
-  const cBR   = n('Normal',     480, 380);
-  const cBL   = n('Normal',     320, 380);
-  const cTL   = n('Normal',     320, 240);
+// 프리셋 2: 중형 — 4×5 그리드 (20노드, 공정 2×4)
+// 공정 노드가 대각선으로 분산 → 어떤 두 노드 사이에도 복수의 동등한 경로 존재
+function buildMediumMap(): MapData {
+  return buildGrid(4, 5, 100, 185, 75, 125, {
+    '0,0': 'Deposition', '0,2': 'Exposure',
+    '1,3': 'Etching',
+    '2,0': 'Cleaning',   '2,2': 'Depot',
+    '3,1': 'Deposition', '3,3': 'Exposure',
+    '4,0': 'Etching',    '4,2': 'Cleaning',
+  });
+}
 
-  return {
-    nodes: [dep1,nO1,exp1,nO2,etch1,nO3,cln1,nO4,dep2,nO5, exp2,etch2,cln2,dep3, exp3,etch3,cln3,dep3b, depot,cT,cR,cB,cL,cTR,cBR,cBL,cTL],
-    edges: [
-      // 외곽 링
-      ...bi(dep1.id,nO1.id), ...bi(nO1.id,exp1.id), ...bi(exp1.id,nO2.id), ...bi(nO2.id,etch1.id),
-      ...bi(etch1.id,nO3.id), ...bi(nO3.id,cln1.id), ...bi(cln1.id,nO4.id), ...bi(nO4.id,dep2.id),
-      ...bi(dep2.id,nO5.id), ...bi(nO5.id,dep1.id),
-      // 중간 링
-      ...bi(exp2.id,etch2.id), ...bi(etch2.id,cln2.id), ...bi(cln2.id,dep3.id), ...bi(dep3.id,exp2.id),
-      // 내부 링
-      ...bi(exp3.id,etch3.id), ...bi(etch3.id,cln3.id), ...bi(cln3.id,dep3b.id), ...bi(dep3b.id,exp3.id),
-      // 중앙 허브
-      ...bi(depot.id,cT.id), ...bi(depot.id,cR.id), ...bi(depot.id,cB.id), ...bi(depot.id,cL.id),
-      ...bi(cT.id,cTR.id), ...bi(cTR.id,cR.id), ...bi(cR.id,cBR.id), ...bi(cBR.id,cB.id),
-      ...bi(cB.id,cBL.id), ...bi(cBL.id,cL.id), ...bi(cL.id,cTL.id), ...bi(cTL.id,cT.id),
-      // 외곽 → 중간 링 연결
-      ...bi(exp1.id,exp2.id), ...bi(etch1.id,etch2.id), ...bi(cln1.id,cln2.id), ...bi(dep1.id,dep3.id),
-      // 중간 → 내부 링 연결
-      ...bi(exp2.id,exp3.id), ...bi(etch2.id,etch3.id), ...bi(cln2.id,cln3.id), ...bi(dep3.id,dep3b.id),
-      // 내부 → 허브 연결
-      ...bi(exp3.id,cTR.id), ...bi(etch3.id,cBR.id), ...bi(cln3.id,cBL.id), ...bi(dep3b.id,cTL.id),
-      // 외곽 지름길 → 허브
-      ...bi(dep2.id,cL.id), ...bi(cln1.id,cB.id),
-    ],
-  };
+// 프리셋 3: 대형 — 5×6 그리드 (30노드, 공정 3×4, Depot 2)
+// 공정 노드가 체스판처럼 분산 → 로봇들이 자연스럽게 여러 경로로 퍼짐
+// Depot 2개(중앙 + 우하단)로 스폰 부하 분산 → 귀환 경로 포화 방지
+function buildLargeMap(): MapData {
+  return buildGrid(5, 6, 80, 145, 65, 110, {
+    '0,0': 'Deposition', '0,2': 'Exposure',
+    '1,4': 'Etching',
+    '2,0': 'Cleaning',   '2,2': 'Depot',   '2,4': 'Exposure',
+    '3,1': 'Deposition', '3,3': 'Cleaning',
+    '4,0': 'Exposure',                      '4,4': 'Etching',
+    '5,1': 'Etching',    '5,2': 'Cleaning', '5,3': 'Deposition', '5,4': 'Depot',
+  });
 }
 
 export function NodePalette() {
@@ -391,7 +340,7 @@ export function NodePalette() {
             {([
               { label: '소형', sub: '공정 1×4 · 13노드', fn: buildSmallMap,  color: '#58a6ff' },
               { label: '중형', sub: '공정 2×4 · 18노드', fn: buildMediumMap, color: '#ffa657' },
-              { label: '대형', sub: '공정 3×4 · 27노드', fn: buildLargeMap,  color: '#bc8cff' },
+              { label: '대형', sub: '공정 3×4 · 30노드', fn: buildLargeMap,  color: '#bc8cff' },
             ] as const).map(({ label, sub, fn, color }) => (
               <button
                 key={label}
