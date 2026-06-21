@@ -94,9 +94,13 @@ namespace OHTSim.Simulation
                 var target = PickNextTarget(agent);
                 if (target == null) { yield return new WaitForSeconds(1f); continue; }
 
-                // 단순 BFS 경로 탐색
-                var path = SimpleBFS(agent.Map, agent.CurrentNodeId, target.id);
-                if (path == null || path.Count < 2) { yield return new WaitForSeconds(0.5f); continue; }
+                // PathfindingBridge를 통한 경로 탐색 (Priority A* 기본)
+                var fromNode = agent.Map.FindNode(agent.CurrentNodeId);
+                if (fromNode == null) { yield return new WaitForSeconds(0.5f); continue; }
+                var nodes = PathfindingBridge.FindPath(AlgorithmId.Priority, fromNode, target, agent.Map,
+                    agent.Congestion);
+                if (nodes == null || nodes.Count < 2) { yield return new WaitForSeconds(0.5f); continue; }
+                var path = nodes.ConvertAll(n => n.id);
 
                 // 경로를 따라 이동
                 for (int i = 1; i < path.Count; i++)
@@ -135,56 +139,6 @@ namespace OHTSim.Simulation
             var candidates = agent.Map.nodes.FindAll(n => n.type == targetType);
             if (candidates.Count == 0) return null;
             return candidates[Random.Range(0, candidates.Count)];
-        }
-
-        // 단순 BFS (노드 ID 기반)
-        static List<string> SimpleBFS(OHTMapData map, string fromId, string toId)
-        {
-            if (fromId == toId) return new List<string> { fromId };
-
-            var queue   = new Queue<string>();
-            var visited = new HashSet<string>();
-            var parent  = new Dictionary<string, string>();
-
-            queue.Enqueue(fromId);
-            visited.Add(fromId);
-
-            // 엣지 인접 맵 빌드
-            var adj = new Dictionary<string, List<string>>();
-            foreach (var e in map.edges)
-            {
-                if (!adj.ContainsKey(e.fromId)) adj[e.fromId] = new List<string>();
-                adj[e.fromId].Add(e.toId);
-            }
-
-            while (queue.Count > 0)
-            {
-                var cur = queue.Dequeue();
-                if (cur == toId)
-                {
-                    // 경로 역추적
-                    var path = new List<string>();
-                    var node = toId;
-                    while (node != null)
-                    {
-                        path.Insert(0, node);
-                        parent.TryGetValue(node, out node);
-                    }
-                    return path;
-                }
-
-                if (!adj.TryGetValue(cur, out var neighbors)) continue;
-                foreach (var next in neighbors)
-                {
-                    if (!visited.Contains(next))
-                    {
-                        visited.Add(next);
-                        parent[next] = cur;
-                        queue.Enqueue(next);
-                    }
-                }
-            }
-            return null;
         }
 
         static float ProcessTime(NodeType type) => type switch
@@ -229,6 +183,8 @@ namespace OHTSim.Simulation
             public string CurrentNodeId;
             public int ProcessStep = -1;
             public Coroutine Coroutine;
+            // Priority A*용 혼잡도 맵 (외부에서 매 틱 갱신 예정)
+            public Dictionary<string, float> Congestion = new();
         }
     }
 }

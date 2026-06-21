@@ -34,6 +34,7 @@ const CLASSES: ClassNode[] = [
   { id: 'MapBuilder',      name: 'MapBuilder',       namespace: 'OHTSim.Core',       file: 'Core/MapBuilder.cs',       kind: 'MonoBehaviour', responsibility: 'OHTMapData → 3D GameObject',  x: 400, y: 280 },
   { id: 'NodeInfo',        name: 'NodeInfo',         namespace: 'OHTSim.Core',       file: 'Core/MapBuilder.cs',       kind: 'MonoBehaviour', responsibility: '노드 GO에 부착 — id·type 조회', x: 600, y: 280 },
   { id: 'MapLoaderService', name: 'MapLoaderService', namespace: 'OHTSim.Core',      file: 'Core/MapLoaderService.cs', kind: 'MonoBehaviour', responsibility: 'StreamingAssets 로드 오케스트레이터', x: 250, y: 400 },
+  { id: 'PathfindingBridge', name: 'PathfindingBridge', namespace: 'OHTSim.Core',   file: 'Core/PathfindingBridge.cs', kind: 'static',       responsibility: 'TS algorithms.ts → C# 포팅 (6종 알고리즘)', x: 650, y: 280 },
   // Simulation
   { id: 'SimulationController', name: 'SimulationController', namespace: 'OHTSim.Simulation', file: 'Simulation/SimulationController.cs', kind: 'MonoBehaviour', responsibility: '상태 기계 WaitingForMap→Ready→Running', x: 400, y: 500 },
   { id: 'AgentController', name: 'AgentController',  namespace: 'OHTSim.Simulation', file: 'Simulation/AgentController.cs',     kind: 'MonoBehaviour', responsibility: '에이전트 스폰 · BFS 경로 · 코루틴 이동', x: 650, y: 400 },
@@ -55,6 +56,8 @@ const DEPS: Dependency[] = [
   { from: 'AgentController', to: 'SimulationController', label: 'OnStarted event',  style: 'dashed' },
   { from: 'AgentController', to: 'MapLoaderService',   label: 'CurrentMap',        style: 'solid' },
   { from: 'AgentController', to: 'MapBuilder',         label: 'mapScale / GO ref', style: 'dashed' },
+  { from: 'AgentController', to: 'PathfindingBridge',  label: 'FindPath()',        style: 'solid' },
+  { from: 'PathfindingBridge', to: 'MapNode',          label: 'node.edges',        style: 'dashed' },
   { from: 'MapSelectorUI',   to: 'MapLoaderService',   label: 'LoadMap()',         style: 'solid' },
   { from: 'MapSelectorUI',   to: 'SimulationController', label: 'OnMapLoaded()',   style: 'solid' },
   { from: 'StartSimButtonUI', to: 'SimulationController', label: 'Start/Stop()',   style: 'solid' },
