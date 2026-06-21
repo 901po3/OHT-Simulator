@@ -4,6 +4,7 @@ import { EditorPage } from './pages/EditorPage';
 import { ProcessPage } from './pages/ProcessPage';
 import { AlgorithmPageRoute } from './pages/AlgorithmPageRoute';
 import { SimulationPage } from './pages/SimulationPage';
+import { ArchitecturePage } from './pages/ArchitecturePage';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/process"     element={<ProcessPage />} />
           <Route path="/algorithm"   element={<AlgorithmPageRoute />} />
           <Route path="/simulation"  element={<SimulationPage />} />
+          <Route path="/architecture" element={<ArchitecturePage />} />
         </Routes>
       </div>
     </BrowserRouter>

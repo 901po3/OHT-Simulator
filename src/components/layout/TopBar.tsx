@@ -5,9 +5,10 @@ import { exportToXml, downloadXml } from '../../core/export/xmlSerializer';
 
 // 공정 페이지는 마지막 순서 — 개인 참고용 부록 성격
 const NAV_ITEMS = [
-  { to: '/editor',     label: '맵 에디터' },
-  { to: '/algorithm', label: '길찾기 알고리즘 선택 과정' },
-  { to: '/process',   label: '나를 위한 반도체 공정 요약' },
+  { to: '/editor',       label: '맵 에디터' },
+  { to: '/algorithm',    label: '길찾기 알고리즘 선택 과정' },
+  { to: '/architecture', label: '코드 구조' },
+  { to: '/process',      label: '나를 위한 반도체 공정 요약' },
 ];
 
 const iconBtn = (disabled: boolean): React.CSSProperties => ({
