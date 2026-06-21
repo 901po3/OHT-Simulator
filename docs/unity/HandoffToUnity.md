@@ -1,163 +1,308 @@
 # OHT 시뮬레이터 — Unity 3D 핸드오프 문서
 
-> 기준 경로: `C:\Unity\Portfolio\OHT-System\My project`
-> Git remote: `https://github.com/901po3/OHT-System.git`
+> Unity AI 작업 범위: 웹 에디터가 내보낸 XML 파일을 파싱하고 3D 씬으로 구현한다.
 
 ---
 
-## 프로젝트 구조
+## 1. XML 포맷 (웹 에디터 출력)
 
-```
-Assets/
-  Scripts/
-    Core/
-      OHTMapData.cs        — 데이터 모델 (NodeType, MapNode, MapEdge, OHTMapData, BuildAdjacency)
-      MapXmlParser.cs      — XML → OHTMapData 파서
-      MapBuilder.cs        — OHTMapData → 3D GameObject 생성
-      MapLoaderService.cs  — StreamingAssets/Maps/ 로드 오케스트레이터
-      PathfindingBridge.cs — TypeScript algorithms.ts의 C# 포트 (6가지 알고리즘)
-    Simulation/
-      SimulationController.cs — 시뮬레이션 상태 기계 (WaitingForMap→Ready→Running)
-      AgentController.cs      — 3D 에이전트 생성·이동·공정 순환 (PathfindingBridge 사용)
-    UI/
-      MapSelectorUI.cs     — 플레이 모드 진입 시 맵 선택 전체화면 패널
-      StartSimButtonUI.cs  — 상단 중앙 대형 시작/중지 버튼
-      SimOverlayUI.cs      — 시뮬레이션 진행 중 HUD (처리 완료, 처리량, 경과 시간)
-  StreamingAssets/
-    Maps/                  — 웹 에디터에서 내보낸 .xml 파일 저장 위치
-```
-
----
-
-## XML 포맷 (웹 에디터 출력)
-
-웹 `xmlSerializer.ts`가 생성하는 포맷:
+웹 에디터의 "XML 내보내기" 버튼이 생성하는 포맷:
 
 ```xml
 <OHTMap version="1.0">
   <Nodes>
-    <Node id="n1" x="100" y="200" type="Deposition"/>
-    <Node id="n2" x="300" y="200" type="Exposure"/>
+    <Node id="node-1" x="100" y="200" type="Deposition"/>
+    <Node id="node-2" x="300" y="200" type="Exposure"/>
+    <Node id="node-3" x="200" y="100" type="Normal"/>
   </Nodes>
   <Edges>
-    <Edge id="e1" from="n1" to="n2" weight="1"/>
+    <Edge id="edge-1" from="node-1" to="node-2" weight="1"/>
+    <Edge id="edge-2" from="node-2" to="node-1" weight="1"/>
+    <Edge id="edge-3" from="node-1" to="node-3" weight="1"/>
   </Edges>
 </OHTMap>
 ```
 
-NodeType 값: `Normal` | `Deposition` | `Exposure` | `Etching` | `Cleaning` | `Depot`
+**NodeType 값:** `Normal` | `Deposition` | `Exposure` | `Etching` | `Cleaning` | `Depot`
+
+**좌표계:** 웹 에디터의 픽셀 좌표 (x, y). Unity 변환: `x → X축`, `y → Z축`, `Y축 = 0` (바닥 평면).
+스케일: `웹 px × 0.01 = Unity 단위` (예: 웹 100px → Unity 1.0).
 
 ---
 
-## [E] Unity 확장 기능
+## 2. C# 데이터 모델
 
-### E-1 MapSelectorUI — 맵 선택 다이얼로그
+XML을 파싱해서 담을 C# 클래스 (`OHTMapData.cs`):
 
-- **구현 파일**: `Assets/Scripts/UI/MapSelectorUI.cs`
-- **동작**: 플레이 모드 Start() 시 전체화면 패널 표시
-- **동작**: `StreamingAssets/Maps/` 내 `.xml` 파일 목록을 스크롤 리스트로 표시
-- **동작**: 파일 선택 → `MapLoaderService.LoadMap()` → `SimulationController.OnMapLoaded()`
-- **Unity 씬 설정**:
-  - Canvas > Panel (panelRoot) > ScrollView > Content (fileListContent)
-  - Button 프리팹 (buttonPrefab) — Text 자식 포함
-  - Text (emptyLabel) — 파일 없을 때 안내
-  - Inspector에서 loaderService, simController 연결
+```csharp
+using System.Collections.Generic;
 
-### E-2 3D 렌더링 — MapBuilder
+namespace OHTSim.Core
+{
+    public enum NodeType { Normal, Deposition, Exposure, Etching, Cleaning, Depot }
 
-- **구현 파일**: `Assets/Scripts/Core/MapBuilder.cs`
-- **동작**: `Build(OHTMapData)` 호출 시 OHTMap 루트 오브젝트 아래에 노드·엣지 생성
-- **노드**: Sphere Primitive (또는 커스텀 프리팹), 타입별 색상 (웹 에디터 NODE_META 기준)
-- **엣지**: LineRenderer, 방향 표시 없음 (단순 연결선)
-- **색상 매핑**:
-  - Normal `#58a6ff` | Deposition `#bc8cff` | Exposure `#ffa657`
-  - Etching `#f85149` | Cleaning `#3fb950` | Depot `#8b949e`
-- **스케일**: 웹 px × 0.01 = Unity 단위 (Inspector에서 `mapScale` 조정 가능)
+    public class MapNode
+    {
+        public string   Id;
+        public float    X, Y;   // 웹 에디터 픽셀 좌표 (그대로 보존)
+        public NodeType Type;
+        public List<MapEdge> Edges = new List<MapEdge>();
+    }
 
-### E-3 시뮬레이션 시작 버튼 — StartSimButtonUI
+    public class MapEdge
+    {
+        public string   Id;
+        public MapNode  From;
+        public MapNode  To;
+        public float    Weight;
+    }
 
-- **구현 파일**: `Assets/Scripts/UI/StartSimButtonUI.cs`
-- **위치**: Canvas 상단 중앙 고정 앵커 (Anchor Preset: Top-Center)
-- **동작**:
-  1. 맵 미선택 시 비활성 ("⏳ 맵 로딩 중...")
-  2. 맵 로드 완료 → 활성화 ("▶ 시뮬레이션 시작")
-  3. 클릭 → `SimulationController.StartSimulation()`, 레이블 "■ 시뮬레이션 중지"로 전환
-  4. 재클릭 → `SimulationController.StopSimulation()`
-- **Unity 씬 설정**: Canvas > Button (button) + Text (label), Inspector에서 simController 연결
+    public class OHTMapData
+    {
+        public List<MapNode> Nodes = new List<MapNode>();
+        public List<MapEdge> Edges = new List<MapEdge>();
 
-### E-4 PathfindingBridge — TypeScript 알고리즘 C# 포트
-
-- **구현 파일**: `Assets/Scripts/Core/PathfindingBridge.cs`
-- **동작**: `FindPath(AlgorithmId, from, to, map, congestion, reservations?, noise?)` → `List<MapNode>`
-- **AlgorithmId**: Standard, Dijkstra, Greedy, Stochastic, Priority, CbsLite
-- **전제 조건**: `OHTMapData.BuildAdjacency()` 호출 후 사용 (MapLoaderService에서 자동 호출)
-- **Priority A***: `costMul = 1 + congestion * 2.5`
-- **CBS-Lite**: 예약 노드 패널티 8f 적용
-
-### E-5 AgentController — 3D 에이전트 이동
-
-- **구현 파일**: `Assets/Scripts/Simulation/AgentController.cs`
-- **동작**:
-  1. `SimulationController.OnSimulationStarted` 구독 → `SpawnAgents(map)` 호출
-  2. Depot 노드(없으면 첫 번째 노드)에서 에이전트 스폰
-  3. `AgentLoop` 코루틴: 공정 노드 순환 (Deposition → Exposure → Etching → Cleaning) 반복
-  4. 각 이동 구간: `PathfindingBridge.FindPath(Priority)` → 노드 간 `MoveTowards`
-  5. 공정 처리 후 `OnJobCompleted` 이벤트 발생
-- **Inspector 설정**: agentPrefab (null이면 Capsule 자동), agentCount, moveSpeed, loaderService, mapBuilder
-- **이벤트**: `public event Action OnJobCompleted` — SimOverlayUI가 구독
-
-### E-6 SimOverlayUI — 시뮬레이션 HUD
-
-- **구현 파일**: `Assets/Scripts/UI/SimOverlayUI.cs`
-- **동작**:
-  - `SimulationController.OnSimulationStarted` → 패널 활성화, 카운터 초기화
-  - `AgentController.OnJobCompleted` 구독 → `_completedJobs++`
-  - 0.5초마다 업데이트: 처리 완료 수 / 처리량(job/min) / 경과 시간(mm:ss)
-  - `SimulationController.OnSimulationStopped` → 패널 비활성화
-- **Unity 씬 설정**:
-  - Canvas > Panel (panelRoot, 하단 또는 우측 고정)
-  - Text × 3: labelCompleted / labelThroughput / labelElapsed
-  - Inspector에서 simController, agentController 연결
+        // 파싱 후 반드시 호출 — MapNode.Edges 연결 리스트를 채운다
+        public void BuildAdjacency()
+        {
+            var nodeMap = new Dictionary<string, MapNode>();
+            foreach (var n in Nodes) nodeMap[n.Id] = n;
+            foreach (var e in Edges)
+            {
+                if (nodeMap.TryGetValue(e.From.Id, out var from))
+                    from.Edges.Add(e);
+            }
+        }
+    }
+}
+```
 
 ---
 
-## Unity 씬 조립 순서
+## 3. XML 파서 (`MapXmlParser.cs`)
 
-1. **빈 씬** 생성 (또는 URP Sample Scene 초기화)
-2. **빈 GameObject** `[Services]` 생성:
-   - `MapLoaderService` 컴포넌트 부착 (MapBuilder 자동 Required)
-   - `MapBuilder` Inspector에서 nodePrefab 연결 (없으면 Sphere 자동 생성)
-3. **빈 GameObject** `[SimController]` 생성:
-   - `SimulationController` 컴포넌트 부착
-   - `AgentController` 컴포넌트 부착 (RequireComponent로 자동)
-   - loaderService, mapBuilder 필드에 `[Services]` 연결
-4. **UI Canvas** (Screen Space - Overlay) 생성:
-   - **MapSelectorUI 패널** — 전체화면 Panel, ScrollView, Button 프리팹, Text
-   - **StartSimButton** — 상단 중앙 Button (폰트 크기 28+, 너비 320px)
-   - **SimOverlay 패널** — 하단 또는 우측 반투명 패널, Text × 3
-5. Inspector 연결:
-   - MapSelectorUI: loaderService / simController
-   - StartSimButtonUI: simController
-   - SimOverlayUI: simController / agentController
-6. **재생 버튼** → 맵 선택 패널 자동 표시
+```csharp
+using System.Xml;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace OHTSim.Core
+{
+    public static class MapXmlParser
+    {
+        public static OHTMapData Parse(string xmlText)
+        {
+            var data    = new OHTMapData();
+            var nodeMap = new Dictionary<string, MapNode>();
+
+            var doc = new XmlDocument();
+            doc.LoadXml(xmlText);
+
+            // ── 노드 파싱 ──────────────────────────────────────
+            foreach (XmlElement el in doc.SelectNodes("//Node"))
+            {
+                var node = new MapNode
+                {
+                    Id   = el.GetAttribute("id"),
+                    X    = float.Parse(el.GetAttribute("x")),
+                    Y    = float.Parse(el.GetAttribute("y")),
+                    Type = ParseNodeType(el.GetAttribute("type")),
+                };
+                data.Nodes.Add(node);
+                nodeMap[node.Id] = node;
+            }
+
+            // ── 엣지 파싱 ──────────────────────────────────────
+            foreach (XmlElement el in doc.SelectNodes("//Edge"))
+            {
+                var fromId = el.GetAttribute("from");
+                var toId   = el.GetAttribute("to");
+
+                if (!nodeMap.TryGetValue(fromId, out var from) ||
+                    !nodeMap.TryGetValue(toId,   out var to))
+                {
+                    Debug.LogWarning($"[MapXmlParser] 엣지 {el.GetAttribute("id")}: 노드 미발견");
+                    continue;
+                }
+
+                data.Edges.Add(new MapEdge
+                {
+                    Id     = el.GetAttribute("id"),
+                    From   = from,
+                    To     = to,
+                    Weight = float.TryParse(el.GetAttribute("weight"), out var w) ? w : 1f,
+                });
+            }
+
+            data.BuildAdjacency();
+            return data;
+        }
+
+        static NodeType ParseNodeType(string s) => s switch
+        {
+            "Deposition" => NodeType.Deposition,
+            "Exposure"   => NodeType.Exposure,
+            "Etching"    => NodeType.Etching,
+            "Cleaning"   => NodeType.Cleaning,
+            "Depot"      => NodeType.Depot,
+            _            => NodeType.Normal,
+        };
+    }
+}
+```
 
 ---
 
-## 웹 → Unity 맵 파일 전달
+## 4. MapBuilder — XML 데이터 → 3D 씬 (`MapBuilder.cs`)
+
+```csharp
+using UnityEngine;
+using System.Collections.Generic;
+using OHTSim.Core;
+
+namespace OHTSim.Core
+{
+    public class MapBuilder : MonoBehaviour
+    {
+        [Header("스케일")]
+        public float mapScale = 0.01f;  // 웹 px → Unity 단위
+
+        [Header("노드 프리팹 (null이면 Sphere 자동 생성)")]
+        public GameObject nodePrefab;
+
+        // 노드 타입별 색상 (웹 에디터 NODE_META 기준)
+        static readonly Dictionary<NodeType, Color> NODE_COLORS = new()
+        {
+            { NodeType.Normal,      new Color(0.345f, 0.651f, 1.000f) }, // #58a6ff
+            { NodeType.Deposition,  new Color(0.737f, 0.549f, 1.000f) }, // #bc8cff
+            { NodeType.Exposure,    new Color(1.000f, 0.651f, 0.341f) }, // #ffa657
+            { NodeType.Etching,     new Color(0.973f, 0.318f, 0.286f) }, // #f85149
+            { NodeType.Cleaning,    new Color(0.247f, 0.722f, 0.314f) }, // #3fb950
+            { NodeType.Depot,       new Color(0.545f, 0.580f, 0.620f) }, // #8b949e
+        };
+
+        GameObject _root;
+
+        // 기존 씬 제거 후 새 맵 생성 — MapLoaderService에서 호출
+        public void Build(OHTMapData data)
+        {
+            if (_root != null) Destroy(_root);
+            _root = new GameObject("OHTMap");
+
+            var nodeObjects = new Dictionary<string, Transform>();
+
+            // ── 노드 생성 ──────────────────────────────────────
+            foreach (var node in data.Nodes)
+            {
+                var go = nodePrefab != null
+                    ? Instantiate(nodePrefab, _root.transform)
+                    : CreateSphere(_root.transform);
+
+                go.name = $"{node.Type}_{node.Id}";
+
+                // 웹 좌표 → Unity 좌표 (y=0 평면, 웹 y → Unity -z)
+                go.transform.localPosition = new Vector3(
+                    node.X * mapScale,
+                    0f,
+                    -node.Y * mapScale
+                );
+
+                if (go.TryGetComponent<Renderer>(out var rend))
+                    rend.material.color = NODE_COLORS.GetValueOrDefault(node.Type, Color.white);
+
+                nodeObjects[node.Id] = go.transform;
+            }
+
+            // ── 레일(엣지) 생성 ────────────────────────────────
+            foreach (var edge in data.Edges)
+            {
+                if (!nodeObjects.TryGetValue(edge.From.Id, out var fromT) ||
+                    !nodeObjects.TryGetValue(edge.To.Id,   out var toT)) continue;
+
+                var rail = new GameObject($"Rail_{edge.Id}");
+                rail.transform.SetParent(_root.transform);
+
+                var lr = rail.AddComponent<LineRenderer>();
+                lr.positionCount = 2;
+                lr.SetPosition(0, fromT.position);
+                lr.SetPosition(1, toT.position);
+                lr.startWidth = lr.endWidth = 0.05f;
+                lr.material   = new Material(Shader.Find("Sprites/Default"));
+                lr.startColor = lr.endColor = new Color(0.188f, 0.212f, 0.251f); // #30363d
+            }
+        }
+
+        static GameObject CreateSphere(Transform parent)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.transform.SetParent(parent);
+            go.transform.localScale = Vector3.one * 0.3f;
+            return go;
+        }
+    }
+}
+```
+
+---
+
+## 5. MapLoaderService — XML 파일 로드 오케스트레이터 (`MapLoaderService.cs`)
+
+```csharp
+using UnityEngine;
+using System.IO;
+
+namespace OHTSim.Core
+{
+    [RequireComponent(typeof(MapBuilder))]
+    public class MapLoaderService : MonoBehaviour
+    {
+        MapBuilder _builder;
+
+        void Awake() => _builder = GetComponent<MapBuilder>();
+
+        // StreamingAssets/Maps/ 내 파일명 목록
+        public static string[] GetAvailableMapNames()
+        {
+            var dir = Path.Combine(Application.streamingAssetsPath, "Maps");
+            if (!Directory.Exists(dir)) return System.Array.Empty<string>();
+            var files = Directory.GetFiles(dir, "*.xml");
+            var names = new string[files.Length];
+            for (int i = 0; i < files.Length; i++)
+                names[i] = Path.GetFileNameWithoutExtension(files[i]);
+            return names;
+        }
+
+        // 파일명으로 맵 로드 → MapBuilder.Build() 호출
+        public void LoadMap(string mapName)
+        {
+            var path = Path.Combine(Application.streamingAssetsPath, "Maps", mapName + ".xml");
+            if (!File.Exists(path))
+            {
+                Debug.LogError($"[MapLoaderService] 파일 없음: {path}");
+                return;
+            }
+            var xml  = File.ReadAllText(path);
+            var data = MapXmlParser.Parse(xml);
+            _builder.Build(data);
+        }
+    }
+}
+```
+
+---
+
+## 6. 씬 조립 순서
+
+1. 빈 씬 생성
+2. 빈 GameObject `[Services]` 생성
+   - `MapLoaderService` 컴포넌트 추가 (MapBuilder 자동 Required)
+   - `MapBuilder` Inspector: `nodePrefab` 연결 (null이면 Sphere 자동)
+3. 재생 → `MapLoaderService.LoadMap("파일명")` 호출로 맵 로드
+
+---
+
+## 7. 웹 → Unity 맵 전달
 
 1. 웹 에디터에서 맵 편집 후 **"XML 내보내기"** 클릭
 2. 다운로드된 `.xml` 파일을 `Assets/StreamingAssets/Maps/` 에 복사
-3. Unity 플레이 모드 진입 → MapSelectorUI에서 파일 선택
-
----
-
-## 알고리즘 대응표 (TypeScript ↔ C#)
-
-| AlgorithmId | TypeScript 함수 | 특징 |
-|---|---|---|
-| Standard | `findPathStandard` | 기본 A* (휴리스틱 + 가중치) |
-| Dijkstra | `findPathDijkstra` | 다익스트라 (휴리스틱 0) |
-| Greedy | `findPathGreedy` | 탐욕 BFS (g-cost 0) |
-| Stochastic | `findPathStochastic` | A* + 노이즈 탐색 |
-| Priority | `findPathPriority` | A* + 혼잡도 가중치 (costMul = 1 + cong × 2.5) |
-| CbsLite | `findPathCbsLite` | CBS-Lite, 예약 테이블 패널티 |
+3. Unity에서 `MapLoaderService.LoadMap("파일명")` 호출
