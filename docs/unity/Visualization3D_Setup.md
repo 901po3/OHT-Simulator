@@ -77,7 +77,7 @@
 ### 제작 규칙
 - **모든 프리팹의 피벗은 바닥 중앙** (transform.position이 바닥에 닿도록)
 - 각 프리팹 루트에 `NodeView` 컴포넌트 부착 (자동 등록되지만 명시적 부착이 안전)
-- URP/Lit 머티리얼 사용, `_EmissionColor` 활성화로 어두운 공장에서도 식별
+- Unity Lit 머티리얼 사용, `_EmissionColor` 활성화로 어두운 공장에서도 식별
 - 자식 GameObject로 라벨용 빈 자리 (TextMeshPro Optional) 가능
 
 ---

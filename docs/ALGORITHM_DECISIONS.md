@@ -1,7 +1,8 @@
 # 경로탐색 알고리즘 설계 결정 과정
 
-> OHT 시뮬레이터의 핵심 도전: **100대 로봇 무한 운행 중 교착 제거**  
-> 최종 선택: **Priority A* (기본) + CBS-Lite (보조) 하이브리드**
+> OHT 시뮬레이터의 핵심 도전: **100대 로봇 무한 운행 중 교착 제거**
+> 최종 선택: **Priority A* (기본) + WHCA*(CBS-Lite) (보조) 하이브리드**
+> 비교한 알고리즘은 모두 7종: Standard A*, Dijkstra, Greedy BFS, Stochastic A*, CBS Full, Priority A*, CBS-Lite(WHCA*).
 
 ---
 
@@ -54,7 +55,7 @@ function astar(start, goal, grid, heuristic = manhattan):
 
 ---
 
-### **Round 2: CBS-Lite (시공간 예약 테이블)**
+### **Round 2: WHCA* / CBS-Lite (시공간 예약 테이블)**
 
 **핵심 개념: "시공간" 이란?**
 
@@ -73,10 +74,10 @@ CBS-Lite는 **시간 차원**을 추가합니다:
 예약: (Node 5, Frame 3) 점유 불가!
        → "로봇 B는 3번째 프레임에 Node 5를 통과할 수 없음"
 
-8스텝 루킹 어헤드:
-  현재부터 8프레임 미리 봄 (Frame 0~7)
+12스텝 루킹 어헤드:
+  현재부터 12프레임 미리 봄 (Frame 0~11)
   → 충돌을 사전에 감지하고 리플래닝
-  → 교착 완전 해결
+  → 교착 거의 0%로 해소
 ```
 
 **CBS (Conflict-Based Search) 알고리즘:**
@@ -90,7 +91,7 @@ CBS-Lite는 **시간 차원**을 추가합니다:
 **구현 (간선 비용 가중치 기반):**
 ```csharp
 // Unity: Assets/Scripts/Core/PathfindingBridge.cs
-const int CBS_LOOKAHEAD = 8;
+const int CBS_LOOKAHEAD = 12;
 
 // 간선 비용에 혼잡도 배수 적용
 float edgeCost = baseEdgeCost * (1.0f + congestion.Get(nextNodeId) * 2.5f);
@@ -110,12 +111,13 @@ if (upcomingNode is occupied):
 
 ---
 
-### **Round 3: Priority A* + CBS-Lite 하이브리드 ✅ (최종 선택)**
+### **Round 3: Priority A* + WHCA*(CBS-Lite) 하이브리드 ✅ (최종 선택)**
 
 **인사이트:**
-- CBS-Lite는 **모든 로봇에게** 8스텝 예약을 강요
+- CBS-Lite/WHCA*는 **모든 로봇에게** 12스텝 예약을 강요
 - 실제로는 **교착 위험이 높은 순간에만** 필요
 - 아이디어: 혼잡도 기반 동적 전환
+- 추가 안정화: PathCommitmentSteps = 5 (매 틱 재계산이 아닌 5스텝 이동 후에만 재탐색), OpenList를 BinaryHeap&lt;Node&gt;로 교체해 O(log V)
 
 **현재 구현:**
 
@@ -228,6 +230,35 @@ public static List<int> PriorityAstar(
 
 ---
 
+## 🛡 데드락 에스컬레이션 (L1 ~ L4)
+
+하이브리드가 막아도 살아남는 잔여 교착은 단계적으로 해소한다.
+
+| 단계 | 트리거 | 동작 |
+|------|--------|------|
+| L1 | 매 프레임 | Wait-for 그래프 DFS 사이클 감지 → 최저 우선순위 에이전트 ForceReroute (관찰상 약 70% 해소) |
+| L2 | 5초 정지 | 교차로 정지 에이전트를 Blocked 처리, 매 프레임 대안 경로 재계산 |
+| L3.5 | 5초+ 완전 포위 | 인접 4방향 모두 정지 시 차단 로봇들에게 TryPhysicalYield 브로드캐스트 |
+| L3 | 12초 정지 | 인접 빈 노드로 1칸 강제 이동(물리적 공간 확보) 후 경로 재탐색 |
+| L4 | 최후 수단 | AbandonJob → Idle 복귀, Dispatcher가 재배정 |
+
+---
+
+## 💡 의외의 발견 — 시스템이 알고리즘을 압도한다
+
+7종 알고리즘을 단계적으로 비교했지만, **자동 디스패칭**(가장 가까운 가용 로봇 ↔ 가장 가까운 작업 자동 배정 + 모든 로봇이 함께 보는 혼잡도 맵 공유)을 적용한 순간, 알고리즘별 처리량/혼잡도 차이가 **노이즈 수준**으로 줄어들었다. Standard A*조차 자동 디스패칭 위에서는 Priority A* + WHCA* 하이브리드와 구분이 어려울 정도였다.
+
+원인:
+- **목표 자동 분산**: 디스패처가 작업을 공간적으로 흩뿌리니, 로봇들이 같은 최단 경로로 몰리는 구조 자체가 사라진다.
+- **공유된 혼잡 정보**: 모든 알고리즘이 같은 혼잡도 신호를 비용에 반영하므로, 휴리스틱 차이가 만들어내던 격차가 평탄화된다.
+- **"어디로 가느냐"보다 "누가 어디로 배정되느냐"가 지배적**: 경로탐색의 최적성이 아니라 배정의 균형이 시스템 처리량의 상한을 결정한다.
+
+개별 컴포넌트보다 전체 흐름의 설계가 성능 상한을 결정한다는 것은 다중 에이전트 시스템에서 자주 관찰되는 패턴이다. 본 프로젝트의 진짜 기여는 "더 나은 길찾기 알고리즘 선택"이 아니라 **경로탐색 + 자동 디스패칭 + 데드락 에스컬레이션을 결합한 시스템 설계** 그 자체다.
+
+> 단, 한계: 이 관찰은 자동 디스패칭 ON, 100대 / 12×8 맵 조건에서의 정성적 결과다. 디스패칭을 끈 수동 배정, 혹은 극단적 혼잡(200대+, 좁은 통로, 병목 토폴로지)에서는 알고리즘 간 차이가 다시 드러날 수 있다.
+
+---
+
 ## 🎓 배운 점
 
 ### 1. "완벽한" 해법은 없다
@@ -267,7 +298,8 @@ public static List<int> PriorityAstar(
 | Dijkstra | `'dijkstra'` | `AlgorithmId.Dijkstra` | "Dijkstra" |
 | Greedy BFS | `'greedy'` | `AlgorithmId.Greedy` | "Greedy BFS" |
 | Stochastic A* | `'stochastic'` | `AlgorithmId.Stochastic` | "Stochastic A*" |
+| CBS Full | `'cbsFull'` | `AlgorithmId.CbsFull` | "CBS Full" (오프라인/소규모 전용) |
 | **Priority A*** | `'priority'` | `AlgorithmId.Priority` | "Priority A*" ✅ |
-| **CBS-Lite** | `'cbs'` | `AlgorithmId.CbsLite` | "CBS-Lite" / "WHCA*" |
+| **CBS-Lite / WHCA*** | `'cbs'` | `AlgorithmId.CbsLite` | "CBS-Lite" / "WHCA*" (동일 메커니즘) |
 
 > 주의: "WHCA*"와 "CBS-Lite"는 이 프로젝트에서 동일한 메커니즘을 가리킴
