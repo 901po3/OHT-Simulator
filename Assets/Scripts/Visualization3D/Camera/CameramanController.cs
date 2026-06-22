@@ -104,18 +104,21 @@ namespace OHTSim.Visualization3D
 
         private void HandleMapBuilt(int nodeCount, int edgeCount)
         {
-            // 새로운 맵이 빌드되면 드론 위치를 새 맵의 중심지로 즉시 강제 이동 (이상한 위치 스폰 및 기둥 외곽 갇힘 현상 방지)
-            if (_droneAvatar != null)
-            {
-                var spawnPos = GetInitialSpawnPosition();
-                _droneAvatar.transform.position = spawnPos;
-                
-                _droneAvatar.transform.rotation = GetSafeCameraLookRotation();
-                _yaw = _droneAvatar.transform.eulerAngles.y;
-                _yawPrev = _yaw;
-                _currentRoll = 0f;
-                _pitch = 15f;
-            }
+            // 맵 재빌드 시 카메라/드론이 아직 준비 안 되었을 수 있으므로 모든 의존성을 가드한다.
+            if (_droneAvatar == null) return;
+
+            // _cam이 누락되면 다시 시도 — Awake 타이밍 회피
+            if (_cam == null) _cam = GetComponent<Camera>() ?? Camera.main;
+
+            var spawnPos = GetInitialSpawnPosition();
+            _droneAvatar.transform.position = spawnPos;
+
+            // GetSafeCameraLookRotation 내부에서 _cam null 처리됨 — 안전
+            _droneAvatar.transform.rotation = GetSafeCameraLookRotation();
+            _yaw = _droneAvatar.transform.eulerAngles.y;
+            _yawPrev = _yaw;
+            _currentRoll = 0f;
+            _pitch = 15f;
         }
 
         private void HandleCameraModeChanged(SimEvents.CameraMode mode)

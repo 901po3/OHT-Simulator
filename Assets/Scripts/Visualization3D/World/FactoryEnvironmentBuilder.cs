@@ -12,31 +12,38 @@ namespace OHTSim.Visualization3D
         [Header("바닥")]
         [Tooltip("맵 경계 외부로 추가될 여유 공간 (단위)")]
         public float floorPadding = 12f;
-        public Color floorColor = new Color(0.12f, 0.14f, 0.18f);  // 세련된 어두운 메탈릭 클린룸 바닥 (눈부심 방지 및 네온 극대화)
+        public Color floorColor = new Color(0.85f, 0.88f, 0.92f);  // 세련되고 깨끗한 하이글로시 화이트/실버 클린룸 바닥
         [Tooltip("바닥 그리드 라인 강조 emission (0이면 비활성)")]
-        public float floorEmission = 0f;
+        public float floorEmission = 0.15f; // 약간의 발광 반사 효과로 미래지향적 광택 표현
 
         [Header("벽")]
-        public float wallHeight = 8f;
+        public float wallHeight = 10f; // 장비 및 천장 OHT 배치를 위해 높이를 조금 더 높게 조정
         public float wallThickness = 0.5f;
-        public Color wallColor = new Color(0.2f, 0.22f, 0.26f);  // 세련된 차콜 그레이 공장 내벽
+        public Color wallColor = new Color(0.92f, 0.95f, 0.98f);  // 세련된 반도체 공장 화이트 클린룸 판넬 벽
         
         [Header("천장")]
         public bool createCeiling = true;
-        public Color ceilingColor = new Color(0.15f, 0.16f, 0.19f);  // 어두운 천장
+        public Color ceilingColor = new Color(0.88f, 0.90f, 0.93f);  // 하얀 천장
         
         [Header("조명 (클린룸 분위기)")]
         public bool createPointLights = true;
         [Tooltip("바닥 면적 1유닛²당 라이트 1개 비율 (낮을수록 조명 많아짐)")]
-        public float lightDensityArea = 400f;
-        public float lightHeight = 7f;
-        public float lightRange = 18f;
-        public float lightIntensity = 2.2f;
-        public Color lightColor = new Color(0.95f, 0.97f, 1.0f);  // 차가운 백색 클린룸 조명
+        public float lightDensityArea = 250f; // 조명 밀도를 높여 더 밝고 광활한 분위기 형성
+        public float lightHeight = 9f;
+        public float lightRange = 22f;
+        public float lightIntensity = 2.8f; // 조명 강도를 높여 순백색 클린룸 광원을 극대화
+        public Color lightColor = new Color(1.0f, 1.0f, 1.0f);  // 순수 주광색 클린룸 조명
         
         [Header("외곽 기둥")]
         public bool createCornerPillars = true;
-        public Color pillarColor = new Color(0.25f, 0.27f, 0.32f);  // 어두운 기둥 테두리
+        public Color pillarColor = new Color(0.82f, 0.85f, 0.90f);  // 기둥도 클린룸 톤에 맞는 연회색조
+        
+        [Header("데코 에셋")]
+        private readonly string[] DECOR_PREFAB_NAMES = {
+            "Line_01", "Line_02", "Line_03", "Line_04", "Line_05", 
+            "Line_06", "Line_07", "Line_08", "Line_09",
+            "Controller_1", "Controller_2", "Controller_3"
+        };
 
         Transform _envRoot;
 
@@ -60,8 +67,105 @@ namespace OHTSim.Visualization3D
             if (createCeiling)        BuildCeiling(b);
             if (createCornerPillars)  BuildPillars(b);
             if (createPointLights)    BuildLights(b);
+            
+            // 스마트 팩토리 내부 장비 및 컨트롤러 에셋 절차적 배치
+            BuildFactoryDecor(b, builder);
 
             Debug.Log($"[FactoryEnvironmentBuilder] 공장 환경 생성 — 바닥 {b.size.x + floorPadding * 2:F0}×{b.size.z + floorPadding * 2:F0}, 벽 높이 {wallHeight}");
+        }
+
+        private void BuildFactoryDecor(Bounds b, Map3DBuilder builder)
+        {
+#if UNITY_EDITOR
+            // 에디터에서 에셋 데이터베이스를 사용하여 직접 프리팹을 동적으로 로드합니다.
+            float stepX = 10f;
+            float stepZ = 10f;
+
+            float minX = b.min.x + 2f;
+            float maxX = b.max.x - 2f;
+            float minZ = b.min.z + 2f;
+            float maxZ = b.max.z - 2f;
+
+            // 빈/역전 바운드 가드 — 맵 재빌드 직후 빈 NodeViews일 때 무한 루프 방지
+            if (!(maxX > minX) || !(maxZ > minZ))
+            {
+                Debug.LogWarning($"[FactoryEnvironmentBuilder] 데코 스킵 — 비정상 bounds (min=({minX:F1},{minZ:F1}) max=({maxX:F1},{maxZ:F1}))");
+                return;
+            }
+            // 안전 상한 — 거대 맵에서 프레임 멈춤 방지
+            const int MAX_DECOR_ITERATIONS = 4000;
+            int iter = 0;
+
+            for (float x = minX; x <= maxX; x += stepX)
+            {
+                for (float z = minZ; z <= maxZ; z += stepZ)
+                {
+                    if (++iter > MAX_DECOR_ITERATIONS)
+                    {
+                        Debug.LogWarning($"[FactoryEnvironmentBuilder] 데코 반복 상한 도달 — 일부 스킵");
+                        return;
+                    }
+                    // 노드 및 레일 등 핵심 동선과의 충돌 검사
+                    if (CheckTooClose(x, z, builder)) continue;
+
+                    // 데코 리스트에서 무작위 프리팹 로드
+                    string prefabName = DECOR_PREFAB_NAMES[Random.Range(0, DECOR_PREFAB_NAMES.Length)];
+                    GameObject prefab = LoadFactoryPrefab(prefabName);
+                    if (prefab != null)
+                    {
+                        GameObject go = Instantiate(prefab, _envRoot);
+                        go.name = $"Decor_{prefabName}_{x:F0}_{z:F0}";
+                        go.transform.position = new Vector3(x, 0f, z);
+                        
+                        // 자연스러움을 위한 무작위 90도 회전 배정
+                        float angle = Random.Range(0, 4) * 90f;
+                        go.transform.rotation = Quaternion.Euler(0f, angle, 0f);
+                    }
+                }
+            }
+#endif
+        }
+
+#if UNITY_EDITOR
+        private GameObject LoadFactoryPrefab(string name)
+        {
+            string path = $"Assets/UnityFactorySceneHDRP/Scene_Factory/Background/Prefabs/{name}.prefab";
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        }
+#endif
+
+        private bool CheckTooClose(float x, float z, Map3DBuilder builder)
+        {
+            Vector2 p = new Vector2(x, z);
+
+            // 1. 노드들과 너무 근접하는지 확인 (임계값: 5.5 유닛)
+            foreach (var nodeView in builder.NodeViews.Values)
+            {
+                float distNode = Vector2.Distance(p, new Vector2(nodeView.WorldPos.x, nodeView.WorldPos.z));
+                if (distNode < 5.5f) return true;
+            }
+
+            // 2. 천장 레일 선분 경로와 물리적/시각적으로 겹치지 않는지 확인 (임계값: 4.5 유닛)
+            foreach (var seg in builder.RailSegments.Values)
+            {
+                Vector2 s1 = new Vector2(seg.FromPos.x, seg.FromPos.z);
+                Vector2 s2 = new Vector2(seg.ToPos.x, seg.ToPos.z);
+                
+                float distSq = SqrDistanceToSegment(p, s1, s2);
+                if (distSq < 20.25f) return true; // 4.5 * 4.5 = 20.25
+            }
+
+            return false;
+        }
+
+        private float SqrDistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float l2 = ab.sqrMagnitude;
+            if (l2 < 0.0001f) return (p - a).sqrMagnitude;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / l2);
+            Vector2 projection = a + t * ab;
+            return (p - projection).sqrMagnitude;
         }
 
         public void Clear()

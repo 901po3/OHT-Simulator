@@ -34,26 +34,70 @@ namespace OHTSim.Visualization3D
         {
             SimEvents.SimulationStarted += HandleSimulationStarted;
             SimEvents.SimulationStopped += HandleSimulationStopped;
+            SimEvents.MapBuilt          += HandleMapBuilt;
         }
 
         void OnDisable()
         {
             SimEvents.SimulationStarted -= HandleSimulationStarted;
             SimEvents.SimulationStopped -= HandleSimulationStopped;
+            SimEvents.MapBuilt          -= HandleMapBuilt;
         }
 
         // ── 공개 API (UI가 호출) ──────────────────────────────────────
+        // 런타임 슬라이더 호출 핵심 진입점. 맵 로드 전이면 스폰이 무시되지만
+        // 슬라이더 값 자체는 보존되어 다음 시뮬레이션 시작 때 적용된다.
         public void SetTargetCount(int n)
         {
             int max = GameServices.Config != null ? GameServices.Config.maxRobotCount : 100;
             n = Mathf.Clamp(n, 0, max);
+            int before = _active.Count;
 
-            while (_active.Count < n) Spawn();
+            while (_active.Count < n) {
+                int prevCount = _active.Count;
+                Spawn();
+                // 스폰 실패(맵 미로드 등)로 카운트가 늘지 않으면 무한루프 방지를 위해 즉시 탈출
+                if (_active.Count == prevCount) break;
+            }
             while (_active.Count > n) Despawn();
+            if (before != _active.Count)
+                Debug.Log($"[RobotFleetController] SetTargetCount {before} → {_active.Count} (요청={n})");
             SimEvents.RaiseActiveRobotCountChanged(_active.Count);
         }
 
-        public void SetSpeedMultiplier(float m) => GameServices.SpeedMultiplier = m;
+        public void SetSpeedMultiplier(float m)
+        {
+            GameServices.SpeedMultiplier = m;
+            Debug.Log($"[RobotFleetController] SetSpeedMultiplier → {GameServices.SpeedMultiplier:F2}×");
+        }
+
+        // 맵이 새로 빌드되면 기존 로봇 인스턴스의 노드 참조가 모두 무효화된다.
+        // 풀까지 폐기하여 다음 스폰 사이클에서 새 맵 기준으로 깨끗하게 다시 만든다.
+        void HandleMapBuilt(int nodeCount, int edgeCount)
+        {
+            ClearAllRobots();
+            Debug.Log($"[RobotFleetController] 맵 재빌드 감지 — 로봇 풀 초기화 (nodes={nodeCount})");
+        }
+
+        void ClearAllRobots()
+        {
+            // 활성 로봇 강제 디스폰
+            for (int i = _active.Count - 1; i >= 0; i--)
+            {
+                var a = _active[i];
+                if (a != null) Destroy(a.gameObject);
+            }
+            _active.Clear();
+
+            // 풀과 루트 컨테이너도 폐기 — 다음 EnsurePool 호출에서 새로 만든다
+            if (_robotsRoot != null)
+            {
+                Destroy(_robotsRoot.gameObject);
+                _robotsRoot = null;
+            }
+            _pool = null;
+            SimEvents.RaiseActiveRobotCountChanged(0);
+        }
 
         // ── 라이프사이클 ───────────────────────────────────────────────
         void HandleSimulationStarted()

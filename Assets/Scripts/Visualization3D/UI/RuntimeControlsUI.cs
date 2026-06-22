@@ -25,16 +25,30 @@ namespace OHTSim.Visualization3D
                 robotCountSlider.wholeNumbers = true;
                 robotCountSlider.minValue = 0;
                 robotCountSlider.maxValue = maxRobots;
-                robotCountSlider.value    = config != null ? config.initialRobotCount : 12;
+                // 초기값은 SetValueWithoutNotify로 — listener 부착 전이라도 의미 명확화
+                robotCountSlider.SetValueWithoutNotify(config != null ? config.initialRobotCount : 12);
+                // 런타임 조작 가능하도록 명시적으로 보장
+                robotCountSlider.interactable = true;
+                robotCountSlider.onValueChanged.RemoveListener(OnRobotCountChanged);
                 robotCountSlider.onValueChanged.AddListener(OnRobotCountChanged);
+            }
+            else
+            {
+                Debug.LogWarning("[RuntimeControlsUI] robotCountSlider 미연결 — 런타임 로봇 수 조절 불가");
             }
 
             if (speedSlider != null)
             {
                 speedSlider.minValue = 0.1f;
                 speedSlider.maxValue = 5f;
-                speedSlider.value    = config != null ? config.initialSpeedMultiplier : 1f;
+                speedSlider.SetValueWithoutNotify(config != null ? config.initialSpeedMultiplier : 1f);
+                speedSlider.interactable = true;
+                speedSlider.onValueChanged.RemoveListener(OnSpeedChanged);
                 speedSlider.onValueChanged.AddListener(OnSpeedChanged);
+            }
+            else
+            {
+                Debug.LogWarning("[RuntimeControlsUI] speedSlider 미연결 — 런타임 속도 조절 불가");
             }
 
             UpdateLabels();
