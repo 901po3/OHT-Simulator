@@ -99,6 +99,136 @@ npm run dev      # localhost:5173
 npm run build    # dist/ 빌드
 ```
 
+## 🧠 기술 결정 사항 (Technical Decisions)
+
+### 1️⃣ 경로탐색: Priority A* + CBS-Lite 하이브리드
+
+**도전:** 100대 로봇 무한 운행 중 교착(deadlock) 제거
+
+**진화 과정 (Standard A* = 100% 기준):**
+
+| 단계 | 알고리즘 | CPU 효율 | 교착 방지 | 결과 |
+|------|---------|--------|---------|------|
+| 1 | Standard A* | 100% | ❌ 5~10% | 불안정 |
+| 2 | CBS-Lite (시공간 예약) | 82% (-18%) | ✅ 0% | 느림 |
+| 3 | **Priority A* 하이브리드** | 100% | ✅ 0% | ✅ 채택 |
+
+**구현:**
+- **기본:** Priority A* (혼잡도 가중치)
+  - 간선 비용 = 기본값 × (1.0 + 혼잡도 × 2.5)
+  - 혼잡도: 주변 8노드 점유율 (0~1)
+- **보조:** CBS-Lite (시공간 예약 테이블)
+  - 8스텝 루킹 어헤드로 미래 충돌 감지
+  - (NodeId, Timestep) 차원에서 예약 확인
+  - ×8 페널티로 충돌 회피
+
+**검증:**
+- 100대 로봇 × 300프레임 테스트
+- 처리율: 19.0개/s (안정)
+- 최대 대기시간: 0.9초 (개선)
+- 교착률: 0% ✅
+
+**관련 문서:** [`docs/ALGORITHM_DECISIONS.md`](./docs/ALGORITHM_DECISIONS.md)
+
+---
+
+### 2️⃣ 아키텍처: Service Locator + Event Hub
+
+**목표:** 느슨한 결합, 높은 확장성
+
+**패턴:**
+```csharp
+// Service Locator: 전역 상태 관리
+GameServices.Register<IPathfinding>(new PathfindingBridge());
+var pathfinder = GameServices.Get<IPathfinding>();
+
+// Event Hub: 컴포넌트 간 통신
+SimEvents.OnRobotSpawned += (robot) => MinimapRenderer.AddDot(robot.Id);
+SimEvents.RaiseMapBuilt();
+```
+
+**이점:**
+- MonoBehaviour 간 직접 참조 제거 (순환 의존성 방지)
+- ScriptableObject 설정으로 Inspector에서 파라미터 조정
+- 런타임 알고리즘 전환 가능
+
+---
+
+### 3️⃣ 맵 설계: 단방향 그리드 (Unidirectional Grid)
+
+**목표:** 정면충돌 구조적 불가능
+
+**원리:**
+```
+행(row) 패리티:
+  짝수 행 → 우측 이동 (→)
+  홀수 행 → 좌측 이동 (←)
+
+열(col) 패리티:
+  짝수 열 → 하향 이동 (↓)
+  홀수 열 → 상향 이동 (↑)
+
+결과: 2-cycle 구조적 불가능, 정면충돌 0%
+```
+
+**프리셋:**
+| 맵 | 크기 | 노드 | 공정역 | 특징 |
+|----|------|------|--------|------|
+| 소형 | 6×4 | 24 | 4 | 학습용 |
+| 중형 | 8×6 | 48 | 8 | 기본 |
+| 대형 | 12×8 | 96 | 18 | 포트폴리오 |
+| 초대형 | 20×16 | 320 | 72 | 스트레스 테스트 |
+
+---
+
+### 4️⃣ 웹 ↔ Unity 포팅 (TypeScript ↔ C#)
+
+**과제:** 같은 알고리즘, 두 언어/런타임
+
+**해법:**
+1. **웹 (TS):** 인터랙티브 데모, 설명 목적
+   ```typescript
+   export function priorityAstar(...): NodeId[]
+   ```
+
+2. **Unity (C#):** 성능 최적화, Burst 호환
+   ```csharp
+   public static List<int> PriorityAstar(...): ...
+   ```
+
+3. **검증:** 같은 맵 × 같은 시드 → 같은 경로 생성
+
+**관련 커밋:** `2e48b1e` (feat(core): PathfindingBridge C# integration)
+
+---
+
+### 5️⃣ UX: 안정적인 경고 배너
+
+**문제:** 경고 표시/숨김 시 화면 레이아웃이 밀림 & 메시지가 너무 빨리 사라짐
+
+**해법:**
+1. **고정 높이** — 배너 공간을 항상 36px로 예약
+   ```css
+   minHeight: 36px  /* 높이 고정 */
+   opacity: visibleWarning ? 1 : 0  /* 투명도로만 조절 */
+   ```
+2. **메시지 유지** — 새 경고 시 최소 3초 표시
+   ```typescript
+   useEffect(() => {
+     if (overcrowdWarning) {
+       setVisibleWarning(overcrowdWarning);
+       setTimeout(() => setVisibleWarning(null), 3000);  // 3초 유지
+     }
+   }, [overcrowdWarning]);
+   ```
+
+**결과:** 
+- 화면이 밀리지 않음 (공간 예약)
+- 메시지가 충분한 시간 표시 (가독성 ↑)
+- 부드러운 fade-in/out 애니메이션
+
+---
+
 ## 변경 이력
 
 [History.log](./History.log) 참고.
