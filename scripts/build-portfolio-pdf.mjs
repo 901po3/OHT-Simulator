@@ -31,6 +31,10 @@ const css = `
   a { color: #2563eb; text-decoration: none; }
   h2 { page-break-before: auto; }
   h1 + p + p + hr + h2 { page-break-before: always; }
+  h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+  h4 + p, h4 + ul, h4 + ol, h4 + pre, h4 + table,
+  h3 + p, h3 + ul, h3 + ol, h3 + pre, h3 + table,
+  h2 + p, h2 + ul, h2 + ol, h2 + pre, h2 + table { page-break-before: avoid; break-before: avoid; }
 `;
 
 const content = readFileSync(mdPath, 'utf8');
