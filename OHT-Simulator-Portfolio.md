@@ -3,7 +3,6 @@
 ## 👤 개발자
 
 - **이름**: 권혁인 (Hyukin Kwon)
-- **기간**: 3일 / 개인 프로젝트
 - **GitHub**: https://github.com/901po3/OHT-Simulator
 - **관심사**: 스마트팩토리, OHT 시스템, 디지털 트윈
 
@@ -49,8 +48,7 @@
 | **동시 로봇 수** | 100대까지 안정 운행 확인 |
 | **알고리즘 종류** | 7가지 (Standard A*, Dijkstra, Greedy BFS, Stochastic A*, CBS Full, Priority A*, CBS-Lite/WHCA*) |
 | **노드 종류** | 6가지 (Normal, Deposition, Exposure, Etching, Cleaning, Depot) |
-| **플랫폼** | 웹 에디터 (React) + 3D 시뮬레이터 (Unity URP) |
-| **개발 기간** | 3일 (개인 프로젝트, AI 페어 프로그래밍 활용) |
+| **플랫폼** | 웹 에디터 (React) + 3D 시뮬레이터 (Unity) |
 | **코드 규모** | TypeScript ~3,500 LOC + C# ~2,000 LOC (개략치) |
 
 ---
@@ -200,7 +198,7 @@ EditorPage
 └─ SimOverlay (에디터 위 에이전트 표시)
 ```
 
-### 3D 시뮬레이터 (Unity URP)
+### 3D 시뮬레이터 (Unity)
 
 **씬 구성**:
 
@@ -236,6 +234,8 @@ OHTSimulation
 - 핵심 최적화: BinaryHeap, PathCommitmentSteps=5, 혼잡도 맵 공유
 
 > 본 PDF는 요약 위주이며, 단계별 상세 로직과 코드 단편은 `/algorithm` 페이지에서 확인할 수 있다.
+>
+> 🔗 **라이브 데모**: _(배포 후 URL 추가 예정)_
 
 ---
 
