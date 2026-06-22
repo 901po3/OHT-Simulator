@@ -18,7 +18,10 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
-*.log
+# Unity log files (ignore crash/build logs, but allow History.log)
+/[Ll]og*.txt
+/[Cc]rash[Ll]ogs/
+*.log.gz
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be committed to version control.
 *.blend1

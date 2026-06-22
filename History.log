@@ -1,0 +1,142 @@
+# OHT System — History Log
+> 모든 작업 세션의 변경 이력을 시간순으로 기록한다.
+> 형식: [날짜] [유형] 제목 / 세부 내용
+
+---
+
+## 2026-06-21
+
+### [INIT] 프로젝트 스캐폴딩
+- Vite + React + TypeScript 프로젝트 생성 (`oht-system`)
+- 의존성: react-konva, zustand, react-router-dom
+- 기본 폴더 구조 설정: `core/`, `store/`, `components/`, `pages/`
+
+### [FEAT] 맵 에디터 구현
+- `EditorCanvas` — Konva Stage 기반 2D 캔버스
+- `NodePalette` — 6종 노드 드래그&드롭 팔레트 (Normal, Deposition, Exposure, Etching, Cleaning, Depot)
+- `NodeTooltip` — 선택 노드 툴팁 (이동/제거/연결)
+- `editorStore` — Zustand + persist, 노드/엣지 상태 관리, localStorage 자동 저장
+
+### [FEAT] 멀티 페이지 앱 구성
+- React Router v6: `/editor`, `/process`, `/algorithm`
+- `TopBar` — 네비게이션 바 (Undo/Redo 버튼, XML 내보내기 버튼 /editor 전용)
+- `ProcessPage` — 증착/노광/식각/세정 공정 애니메이션 (Canvas 2D 파티클)
+- `AlgorithmPage` — 알고리즘 비교 문서 페이지
+
+### [FEAT] Undo/Redo
+- `editorStore`에 `_past`/`_future` 스냅샷 스택 (최대 50개)
+- `withHistory()` 헬퍼 — 모든 변이 액션에 자동 적용
+- Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z 단축키
+- TopBar Undo/Redo 버튼
+
+### [FEAT] XML 내보내기
+- `xmlSerializer.ts` — Unity 호환 `<OHTMap>` 포맷
+- `downloadXml()` — 브라우저 다운로드 트리거
+- TopBar에 "↓ XML 내보내기" 버튼 (/editor 전용)
+
+### [FEAT] 인-에디터 시뮬레이션 패널 (초기 버전)
+- `simRunStore` — 틱 루프, 에이전트 이동, 혼잡도 맵, 통계
+- 5개 알고리즘: Standard A*, Dijkstra, Greedy BFS, Stochastic A*, Priority A*
+- `SimPanel` — 우측 사이드 패널 (알고리즘 선택, 로봇수/속도 슬라이더, 통계)
+- `SimOverlay` — Konva Layer: 에이전트 박스, 경로 미리보기, 혼잡도 히트맵
+
+### [FEAT] 알고리즘 페이지 전면 개편
+- CBS-Lite (6번째 알고리즘) 추가
+- 자동 최적화 출하 (autoDispatch) 토글 추가
+- 개발 타임라인 섹션 (4단계, 클릭 확장)
+- 전체 알고리즘 4지표 비교 차트
+- CBS 심화 설명 (CT 분기 vs CBS-Lite)
+- Priority A* + WHCA* 하이브리드 상세 설명
+- 보조 기법 8종 카드 (BinaryHeap, CommitmentSteps, WHCA*, TrafficController, GC 최적화, inEdge 캐시, Wait-for 그래프, TryPhysicalYield)
+- 데드락 에스컬레이션 L1~L4 타임라인
+
+### [FEAT] 맵 에디터 기능 확장
+- **Pan**: 빈 캔버스 드래그 → 맵 이동
+- **Zoom**: 마우스 스크롤 (20%~400%), 좌하단 +/−/리셋 버튼
+- **엣지 중간 삽입**: 노드를 레일 위에 드롭 → 엣지 자동 분리 및 삽입, 초록 하이라이트 피드백
+- **연결 방향**: 단방향(→) / 양방향(⇄) 토글 (NodePalette 통합)
+- **JSON 저장**: `.json` 파일 다운로드
+- **JSON 불러오기**: 파일 선택으로 맵 복원
+- **시뮬레이션 전용 페이지** (`/simulation`): 에디터 맵 기반 풀스크린 시뮬레이션
+  - 상단 컨트롤 바: 6종 알고리즘, 로봇수/속도, 자동 최적화, 시작/중지
+  - 우측 패널: 실시간 통계 + OHT 상태 목록
+  - `SimMapCanvas` — 읽기 전용 맵 캔버스 + 에이전트 오버레이 + pan/zoom
+
+### [FIX] 코드 리뷰 Critical 수정 (2026-06-21)
+- **B-1** `NodeType` 불일치 수정: `graph/types.ts` NodeType을 EditorNode 타입 기준으로 통일. `simRunStore` 내 `deliveries`/`sources` 필터를 `Deposition|Exposure|Etching|Cleaning` / `Normal|Depot` 기준으로 수정 → autoDispatch 정상 동작
+- **B-2** `agentSeq` 리셋 타이밍 오류 주석 명시
+- **B-3** `loadFromData` NaN 방어 처리: `safeInt()` 헬퍼로 비표준 id 파싱 오류 차단
+- **B-5** Blob URL 조기 해제 수정: `setTimeout(..., 100)` 지연 해제
+- **C-2** `SimOverlay` null 참조 방지: `agent.currentNode` 존재 확인 후 렌더
+- **S-2** `keydown` 이벤트가 INPUT/TEXTAREA 방해하는 버그 수정
+- **T-2** `SimulationPage` 이중 `useSimRunStore()` 호출 → 단일 구조분해로 통합
+
+---
+
+## 2026-06-21 (세션 2)
+
+### [FIX] 노드 연결 버그 수정 (EditorCanvas.tsx)
+- **원인**: Stage `draggable` prop이 Konva 드래그 시스템을 활성화 → 마이크로 마우스 이동이 드래그로 인식되어 `onClick` 미발생, 연결 흐름 끊김
+- **수정**: Stage `draggable` 제거, `onMouseDown/onMouseMove/onMouseUp` 수동 패닝 구현
+  - `panRef` (useRef) 로 패닝 시작 좌표·원점 추적, Konva 드래그 시스템 비개입
+- **추가**: 노드 Group `onDragStart` 로 드래그 시작 좌표 기록
+  - `onDragEnd`에서 이동 거리 < 4px이면 클릭으로 처리(위치 원복 + `selectNode` 호출)
+
+### [FIX] 양방향 연결 옵션 가시성 수정 (NodePalette.tsx)
+- **원인**: 팔레트 전체가 `overflowY: auto` 단일 컨테이너 → 소규모 뷰포트에서 "연결 방향" 섹션이 스크롤 아래로 숨겨짐
+- **수정**: 레이아웃 이분화
+  - 상단 `flex: 1, overflowY: auto` — 노드 6종 팔레트
+  - 하단 `flexShrink: 0` — 연결 방향 + 저장 섹션 (항상 가시)
+
+### [FEAT] IndexedDB 맵 저장소 (mapStorage.ts + NodePalette.tsx)
+- 새 파일: `src/core/storage/mapStorage.ts`
+  - `saveMap / listMaps / loadMap / deleteMap` — IndexedDB `oht-maps` DB
+- NodePalette 하단 "맵 저장" 섹션 추가 (이름 입력, 목록 토글, 불러오기, 삭제)
+
+### [FEAT] 시뮬레이션 로직 전면 재설계 (simRunStore.ts)
+- **공정 사이클**: 증착 → 노광 → 식각 → 세정 → 반복 (`processStage: number` 필드)
+- **차고지 자동 스폰**: `spawnTimers Map` — 1초 간격 Depot 스폰, 점유 시 대기
+- **상태**: `Loading/Unloading` → `Processing` (1.5초 대기 후 다음 공정으로)
+- **충돌 방지**: `occupied Map` — 다음 노드 점유 시 해당 틱 이동 대기
+- **경로 제약**: `buildRuntimeGraph` EditorEdge 기반 → 연결된 노드로만 이동 보장
+
+### [UPDATE] UI 갱신 (SimOverlay, SimMapCanvas, SimulationPage)
+- Processing 상태 색상/레이블, 에이전트 카드에 다음 공정 단계 표시
+
+---
+
+## 2026-06-21 (세션 12)
+
+### [FIX] Critical: autoDispatch 로직 구현 (simRunStore.ts)
+- `getNextTarget`에 `autoDispatch: boolean` 매개변수 추가
+- `true`: 가장 가까운 공정 노드 (greedy nearest euclidean)
+- `false`: 공정 노드 목록 첫 번째 (고정 순환)
+- `tick` 내에서 `autoDispatch` 상태를 읽어 `getNextTarget`에 전달
+- **이전**: `autoDispatch` UI 토글 존재하나 `tick`에서 사용 안 됨 (dead feature)
+
+### [FIX] Minor: agentSeq HMR 안전화 (simRunStore.ts)
+- 모듈 스코프 `let agentSeq` → Zustand 스토어 상태 `agentSeq: number`로 이동
+- HMR(Hot Module Replacement) 시 리셋되지 않음
+
+### [FIX] Idle deadlock 방어 강화 (simRunStore.ts)
+- `getNextTarget` null 반환 시 Normal→아무 노드 폴백 순으로 탐색
+- null 반환 시 `stateTimer = 0` 리셋으로 CPU 낭비 방지
+
+### [FIX] Major: NodePalette IndexedDB 에러 처리 (NodePalette.tsx)
+- `handleSaveToDb`, `handleLoadFromDb`, `handleDeleteFromDb`에 try/catch 추가
+- `saveErr` 상태 추가, 실패 시 빨간 에러 메시지 표시
+
+### [FIX] Minor: mapStorage DB 연결 풀링 (mapStorage.ts)
+- `_dbPromise` 캐시로 동일 DB 반복 오픈 방지
+- 오류 시 캐시 초기화 → 재시도 가능
+
+### [DOCS] Unity 핸드오프 갱신 (HandoffToUnity.md)
+- [E] 세션 12 신규 태스크 추가:
+  - E-1: 플레이 모드 맵 파일 선택 다이얼로그 (MapSelectorUI.cs)
+  - E-2: 선택된 맵 3D 렌더링 (MapLoaderService + MapBuilder)
+  - E-3: 상단 큰 "▶ 시뮬레이션 시작" 버튼 (StartSimButtonUI.cs)
+
+### [DOCS] 기능 명세 문서 신규 생성 (docs/FEATURES.md)
+- 전 세션 요청 기능을 상태별로 정리 (에디터/시뮬/알고리즘/공정/Unity/통합)
+
+---
