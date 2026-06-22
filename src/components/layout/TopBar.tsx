@@ -102,6 +102,31 @@ export function TopBar() {
       {/* 우측 액션 */}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
 
+        {/* 데모 영상 — 항상 표시 */}
+        <a
+          href="https://youtu.be/0Y_7qUAT7oc"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="데모 영상 (맵 에디팅 → 시뮬레이션 → XML 추출 → Unity 실행)"
+          style={{
+            padding: '5px 12px',
+            background: '#21262d',
+            border: '1px solid #30363d',
+            borderRadius: 6,
+            color: '#f0707b',
+            fontSize: 12,
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          ▶ 데모 영상
+        </a>
+        <div style={{ width: 1, height: 20, background: '#30363d', margin: '0 4px' }} />
+
         {/* Undo / Redo — 에디터 페이지에서만 표시 */}
         {isEditor && (
           <>

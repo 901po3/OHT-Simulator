@@ -115,10 +115,29 @@ export function MobileLayout({ children }: { children: ReactNode }) {
                 {label}
               </NavLink>
             ))}
+            <a
+              href="https://youtu.be/0Y_7qUAT7oc"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              style={{
+                marginTop: 'auto',
+                padding: '14px 12px',
+                borderRadius: 8,
+                textDecoration: 'none',
+                fontSize: 15,
+                color: '#f0707b',
+                background: '#21262d',
+                minHeight: 44,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              ▶ 데모 영상
+            </a>
             <div style={{
-              marginTop: 'auto', fontSize: 11, color: '#6e7681', padding: 8, lineHeight: 1.5,
+              fontSize: 11, color: '#6e7681', padding: 8, lineHeight: 1.5,
             }}>
-              모바일은 읽기 전용 보기입니다.<br />편집·시뮬레이션 조작은 PC에서 가능합니다.
+              상세 화면(길찾기 알고리즘 과정 등)은 PC에서 가장 온전하게 보입니다.
             </div>
           </nav>
         </>
