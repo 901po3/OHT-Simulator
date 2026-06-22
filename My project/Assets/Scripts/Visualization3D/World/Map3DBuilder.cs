@@ -27,11 +27,13 @@ namespace OHTSim.Visualization3D
         public IReadOnlyDictionary<string, RailSegment> RailSegments => _railSegments;
         public Bounds WorldBounds { get; private set; }
 
+        // 서비스 등록은 SceneBootstrapper 단일 책임.
+        // 이 컴포넌트는 자기 자신만 등록하여 Bootstrapper 미사용 시에도 동작하나,
+        // Config/Registry는 인스펙터 직접 할당 → GameServices와 충돌 회피.
         void Awake()
         {
-            GameServices.RegisterMapBuilder(this);
-            if (config != null)         GameServices.RegisterConfig(config);
-            if (prefabRegistry != null) GameServices.RegisterPrefabRegistry(prefabRegistry);
+            if (GameServices.MapBuilder == null)
+                GameServices.RegisterMapBuilder(this);
         }
 
         public void Build(OHTMapData data)
@@ -59,7 +61,18 @@ namespace OHTSim.Visualization3D
         {
             _nodeViews.Clear();
             _railSegments.Clear();
-            if (_mapRoot != null) Destroy(_mapRoot.gameObject);
+            if (_mapRoot != null)
+            {
+                // 같은 프레임에 Build를 다시 호출해도 이전 GameObject가 공존하지 않도록
+                // 에디트 모드면 DestroyImmediate, 플레이 모드는 Destroy 후 _mapRoot null화 직후 신규 컨테이너 생성.
+#if UNITY_EDITOR
+                if (!Application.isPlaying) DestroyImmediate(_mapRoot.gameObject);
+                else                        Destroy(_mapRoot.gameObject);
+#else
+                Destroy(_mapRoot.gameObject);
+#endif
+                _mapRoot = null;
+            }
         }
 
         public NodeView GetNodeView(string nodeId)

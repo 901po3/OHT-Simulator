@@ -58,7 +58,9 @@ namespace OHTSim.Visualization3D
 
         void BuildCacheIfNeeded()
         {
-            if (_cache != null && _cache.Count == entries.Count) return;
+            // 중복 NodeType entry가 있어도 매번 재빌드되지 않도록 null 체크만 사용.
+            // 캐시 무효화는 OnValidate 또는 명시적 호출자에 위임.
+            if (_cache != null) return;
             _cache = new Dictionary<NodeType, Entry>();
             foreach (var e in entries)
             {

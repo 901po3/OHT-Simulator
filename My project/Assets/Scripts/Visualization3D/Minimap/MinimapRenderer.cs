@@ -41,6 +41,11 @@ namespace OHTSim.Visualization3D
 
         void OnDestroy()
         {
+            // 카메라가 RT를 잡고 있는 동안 Release하면 콘솔 경고 — 먼저 끊는다.
+            if (minimapCam != null && minimapCam.Cam != null)
+                minimapCam.Cam.targetTexture = null;
+            if (rawImage != null)
+                rawImage.texture = null;
             if (SharedRenderTexture != null)
             {
                 SharedRenderTexture.Release();

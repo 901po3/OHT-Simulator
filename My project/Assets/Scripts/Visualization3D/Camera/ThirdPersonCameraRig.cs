@@ -72,9 +72,12 @@ namespace OHTSim.Visualization3D
             }
             else target.position = b.center;
 
-            // 맵 크기에 비례한 줌아웃
+            // 사용자가 "공장 중앙에서 둘러보기" 요청 — 가까운 거리, 사람 키 시점
             float maxExtent = Mathf.Max(b.extents.x, b.extents.z);
-            distance = Mathf.Max(distance, maxExtent * 1.2f);
+            // 너무 멀어지지 않게 cap. 사람이 공장 안에서 둘러보는 느낌.
+            distance = Mathf.Clamp(maxExtent * 0.3f, 8f, 25f);
+            height   = _config != null ? _config.cameraInitialHeight : 6f;
+            pitch    = 15f;  // 살짝 위에서 비스듬히 — 위압적인 구조물이 보이도록
         }
 
         void LateUpdate()

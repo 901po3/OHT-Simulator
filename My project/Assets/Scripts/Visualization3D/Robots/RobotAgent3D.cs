@@ -28,6 +28,10 @@ namespace OHTSim.Visualization3D
         Vector3 _moveFrom;
         Vector3 _moveTo;
 
+        // Idle 시 pathfinding 실패 후 쿨다운 — 매 프레임 무의미한 재탐색 방지
+        float _idleCooldown;
+        const float IDLE_RETRY_COOLDOWN = 0.5f;
+
         OHTMapData _map;
         Map3DBuilder _builder;
         VisualizationConfig _config;
@@ -67,20 +71,33 @@ namespace OHTSim.Visualization3D
         // ── 상태별 ─────────────────────────────────────────────────────
         void TickIdle()
         {
+            // 매 프레임 path 재탐색 방지 — 직전 실패 시 쿨다운만큼 대기.
+            if (_idleCooldown > 0f)
+            {
+                _idleCooldown -= Time.deltaTime;
+                return;
+            }
+
             // 다음 공정 노드 선택
-            _processStep = (_processStep + 1) % PROCESS_CYCLE.Length;
-            var targetType = PROCESS_CYCLE[_processStep];
+            int nextStep = (_processStep + 1) % PROCESS_CYCLE.Length;
+            var targetType = PROCESS_CYCLE[nextStep];
 
             MapNode target = PickNearestNodeOfType(targetType);
-            if (target == null) return;
+            if (target == null) { _idleCooldown = IDLE_RETRY_COOLDOWN; return; }
 
-            TargetNodeId = target.id;
             var fromNode = _map.FindNode(CurrentNodeId);
-            if (fromNode == null) return;
+            if (fromNode == null) { _idleCooldown = IDLE_RETRY_COOLDOWN; return; }
 
             var pathNodes = PathfindingBridge.FindPath(AlgorithmId.Priority, fromNode, target, _map);
-            if (pathNodes == null || pathNodes.Count < 2) return;
+            if (pathNodes == null || pathNodes.Count < 2)
+            {
+                _idleCooldown = IDLE_RETRY_COOLDOWN;
+                return;
+            }
 
+            // 성공 시에만 step 진행
+            _processStep = nextStep;
+            TargetNodeId = target.id;
             _path.Clear();
             for (int i = 1; i < pathNodes.Count; i++) _path.Enqueue(pathNodes[i].id);
             AdvanceToNextHop();
@@ -116,6 +133,8 @@ namespace OHTSim.Visualization3D
 
         void TickProcessing()
         {
+            // 의도: SpeedMultiplier가 시뮬레이션 전체 속도. 이동·처리 모두 동일 배율 적용.
+            // 사용자가 "속도 5×"를 선택하면 처리 시간도 5배 빠르게 — 직관적 시뮬 가속.
             _processTimer -= Time.deltaTime * GameServices.SpeedMultiplier;
             if (_processTimer <= 0f) CurrentState = State.Idle;
         }

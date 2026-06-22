@@ -71,12 +71,8 @@ namespace OHTSim.Visualization3D
             ApplyTransform();
         }
 
-        void Update()
-        {
-            // 풀스크린 토뷰 모드일 때만 입력 처리
-            var fleet = GameServices.FleetController;
-            // (FleetController는 사용하지 않지만, 모드 체크는 MinimapRenderer를 통해 추정)
-        }
+        // 입력 처리는 MinimapRenderer.Update가 모드별로 위임 호출한다.
+        // 자체 Update를 두면 비활성 시에도 빈 호출이 발생하므로 제거.
 
         public void HandleTopViewInput(SimEvents.CameraMode currentMode)
         {

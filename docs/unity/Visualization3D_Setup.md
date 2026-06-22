@@ -104,9 +104,10 @@
 
 ### 5-A. Hierarchy 구조
 ```
-─ Bootstrapper                   (SceneBootstrapper)
+─ Bootstrapper                   (SceneBootstrapper + AutoStartOnMapReady)
 ─ Map Loader Service             (MapLoaderService + MapBuilder [기존 2D])
 ─ Map 3D Builder                 (Map3DBuilder)
+─ Factory Environment Builder    (FactoryEnvironmentBuilder ← 신규: 바닥·벽·천장·조명 자동 생성)
 ─ Simulation Controller          (SimulationController + AgentController [기존])
 ─ Robot Fleet Controller         (RobotFleetController)
 ─ Camera Mode Controller         (CameraModeController)
@@ -115,8 +116,7 @@
 ─ Directional Light              (해 — 5°×30° 회전, intensity 1.2)
 ─ UI Canvas                      (Screen Space - Overlay)
    ├─ MapSelectorPanel           (기존 MapSelectorUI)
-   ├─ StartSimButton             (기존 StartSimButtonUI)
-   ├─ SimOverlay                 (기존 SimOverlayUI)
+   ├─ SimOverlay                 (기존 SimOverlayUI) — 선택
    ├─ RuntimeControls            (RuntimeControlsUI — 좌하단)
    │   ├─ RobotCountSlider + Label
    │   └─ SpeedSlider + Label
@@ -126,6 +126,8 @@
            ├─ RobotCountLabel
            ├─ SpeedLabel
            └─ ModeLabel
+
+* StartSimButton 제거됨 — AutoStartOnMapReady가 맵 로드 직후 자동 시작.
 ```
 
 ### 5-B. Bootstrapper 인스펙터 필드 주입
@@ -152,20 +154,29 @@
 
 ---
 
-## ▶ 6. 동작 흐름
+## ▶ 6. 동작 흐름 (자동 시작 모드)
 
 ```
-[Play] → MapSelectorUI로 맵 선택
-       → MapLoaderService.LoadMap() → 기존 MapBuilder (선택적, 평면 디버그용)
-       → SimulationController.OnMapReady → SceneBootstrapper.BridgeMapReady
-       → Map3DBuilder.Build() → 노드 프리팹 + 레일 세그먼트 생성
-       → 사용자가 StartSimButton 클릭
+[Play] → MapSelectorUI: StreamingAssets/Maps/*.xml 목록 표시
+       → 사용자가 맵 1개 선택
+       → MapLoaderService.LoadMap() — XML 파싱 + 인접 리스트 구축
+       → SimulationController.OnMapReady 발행
+           ├─ SceneBootstrapper.BridgeMapReady → Map3DBuilder.Build()
+           │       → 노드 프리팹 6종 + 긴 레일 세그먼트 생성
+           │       → WorldBounds 산출
+           │       → SimEvents.MapBuilt 발행
+           │           ├─ FactoryEnvironmentBuilder.Rebuild() — 바닥·벽·천장·조명 자동
+           │           ├─ ThirdPersonCameraRig.CenterOnMap() — 공장 중앙, 사람 시점
+           │           └─ MinimapCamera.HandleMapBuilt() — 전경 ortho 자동 조정
+           └─ AutoStartOnMapReady — 0.1초 후 자동 StartSimulation()
        → SimulationController.OnSimulationStarted → SimEvents.RaiseSimulationStarted
-       → RobotFleetController가 InitialRobotCount만큼 스폰
-       → 각 로봇은 RobotAgent3D 상태머신으로 노드 간 보행
-       → UI 슬라이더 조작 시 SetTargetCount/SetSpeedMultiplier 즉시 반영
-       → 미니맵 클릭 → CameraModeController.ToggleTopView() → 풀스크린 2D 토뷰
-       → 토뷰에서 휠/WASD/좌클릭 드래그로 줌·패닝, ESC로 복귀
+       → RobotFleetController가 InitialRobotCount만큼 차고지에서 스폰
+       → 사용자는 공장 중앙에서 로봇 작동을 둘러보는 상태
+           - 우클릭 드래그: 시야 회전
+           - 휠: 줌 (가까이/멀리)
+           - WASD: 공장 내 이동
+           - 좌하단 슬라이더: 로봇 수 0~100, 속도 0.1~5.0×
+           - 우상단 미니맵 클릭: 풀스크린 2D 토뷰 (휠 줌 + 드래그 패닝, ESC 복귀)
 ```
 
 ---
