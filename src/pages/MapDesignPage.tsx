@@ -22,9 +22,9 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 const PROC_COLOR = ['#bc8cff', '#ffa657', '#f85149', '#3fb950']; // 증착·노광·식각·세정
 
-/* 단방향 교차 그리드 동작 시각화 (buildFabMap 축소판) */
+/* 단방향 교차 그리드 동작 시각화 (buildFabMap 축소판, 10×8) */
 function OneWayGridDiagram() {
-  const cols = 6, rows = 5, gap = 70, m = 34, r = 11;
+  const cols = 10, rows = 8, gap = 50, m = 28, r = 9;
   const w = m * 2 + (cols - 1) * gap;
   const h = m * 2 + (rows - 1) * gap;
   const pos = (c: number, rr: number) => ({ x: m + c * gap, y: m + rr * gap });

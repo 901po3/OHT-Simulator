@@ -4,6 +4,7 @@ import { EditorPage } from './pages/EditorPage';
 import { ProcessPage } from './pages/ProcessPage';
 import { AlgorithmPageRoute } from './pages/AlgorithmPageRoute';
 import { MapDesignPage } from './pages/MapDesignPage';
+import { ConsiderationsPage } from './pages/ConsiderationsPage';
 import { SimulationPage } from './pages/SimulationPage';
 import { ArchitecturePage } from './pages/ArchitecturePage';
 
@@ -24,9 +25,10 @@ export default function App() {
           <Route path="/"            element={<Navigate to="/editor" replace />} />
           <Route path="/editor"      element={<EditorPage />} />
           <Route path="/process"     element={<ProcessPage />} />
-          <Route path="/algorithm"   element={<AlgorithmPageRoute />} />
-          <Route path="/map-design"  element={<MapDesignPage />} />
-          <Route path="/simulation"  element={<SimulationPage />} />
+          <Route path="/algorithm"       element={<AlgorithmPageRoute />} />
+          <Route path="/map-design"      element={<MapDesignPage />} />
+          <Route path="/considerations"  element={<ConsiderationsPage />} />
+          <Route path="/simulation"      element={<SimulationPage />} />
           <Route path="/architecture" element={<ArchitecturePage />} />
         </Routes>
       </div>

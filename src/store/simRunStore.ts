@@ -69,14 +69,15 @@ export interface SimAgent {
 export interface ThroughputSample { t: number; perRobot: number; total: number }
 export interface AgentRateSample { t: number; rate: number }
 export interface EfficiencySnapshot {
-  procUtil: number;       // 공정 노드 가동률 (0~1)
-  robotUtil: number;      // 로봇 유효 활동률 (Moving+Processing / 전체)
-  avgWaitSec: number;     // 평균 대기 시간
-  idleRatio: number;      // Idle 비율
-  waitRatio: number;      // Waiting 비율
-  movingRatio: number;    // Moving 비율
-  procRatio: number;      // Processing 비율
-  optimalHint: string;    // 최적 투입 판정 문구
+  procUtil: number;           // 공정 노드 가동률 (0~1, %)
+  avgWaitSec: number;         // 평균 대기 시간 (초)
+  idleRatio: number;          // 로봇 유휴 비율 (0~1, %)
+  avgMoveDist: number;        // 평균 이동 거리 (칸)
+  congestionLevel: number;    // 전체 혼잡도 (0~1, %)
+  bottleneckNodeId: string | null; // 병목 노드 ID
+  bottleneckCongestion: number;    // 병목 혼잡도
+  optimalRobotCount: number;  // 처리량 꺾이는 지점의 로봇 수 (-1 = 미판별)
+  optimalHint: string;        // 최적 투입 판정 문구
 }
 const SAMPLE_SEC        = 1.5; // 처리량 샘플링 주기 (초)
 const MAX_SAMPLES       = 80;  // 전체 시계열 길이
@@ -773,20 +774,44 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
     // ── 효율 스냅샷 (매 tick 갱신) ──────────────────────────────────────
     let newEfficiency: EfficiencySnapshot | null = null;
     if (activeAgents.length > 0) {
-      const movC = activeAgents.filter(a => a.state === 'Moving').length;
       const proC = activeAgents.filter(a => a.state === 'Processing').length;
-      const waiC = activeAgents.filter(a => a.state === 'Waiting').length;
       const idlC = activeAgents.filter(a => a.state === 'Idle').length;
       const tot  = activeAgents.length;
-      const movingRatio = movC / tot;
-      const procRatio   = proC / tot;
-      const waitRatio   = waiC / tot;
-      const idleRatio   = idlC / tot;
-      const robotUtil   = (movC + proC) / tot;
-      const procUtil    = processNodeCount > 0 ? proC / processNodeCount : 0;
-      const avgWaitSec  = tot > 0
+      const procUtil = processNodeCount > 0 ? proC / processNodeCount : 0;
+      const idleRatio = idlC / tot;
+      const avgWaitSec = tot > 0
         ? activeAgents.reduce((s, a) => s + a.blockedSec, 0) / tot
         : 0;
+      const avgMoveDist = tot > 0
+        ? parseFloat((activeAgents.reduce((s, a) => s + a.totalDistance, 0) / tot).toFixed(1))
+        : 0;
+
+      // 혼잡도 = 평균 노드 점유율
+      const congestionLevel = newCong.size > 0
+        ? parseFloat((Array.from(newCong.values()).reduce((s, v) => s + v, 0) / newCong.size).toFixed(3))
+        : 0;
+
+      // 병목 노드 (가장 높은 혼잡도)
+      let bottleneckNodeId: string | null = null;
+      let bottleneckCongestion = 0;
+      for (const [id, cong] of newCong.entries()) {
+        if (cong > bottleneckCongestion) {
+          bottleneckCongestion = cong;
+          bottleneckNodeId = id;
+        }
+      }
+
+      // 최적 로봇 수 감지: throughputHistory에서 기울기 변화가 커지는 지점
+      let optimalRobotCount = -1;
+      if (newThroughput.length >= 4) {
+        const rates = newThroughput.map(s => s.perRobot);
+        let maxAccel = 0, accelIdx = -1;
+        for (let i = 2; i < rates.length; i++) {
+          const accel = Math.abs((rates[i] - rates[i - 1]) - (rates[i - 1] - rates[i - 2]));
+          if (accel > maxAccel && accel > 0.2) { maxAccel = accel; accelIdx = i; }
+        }
+        if (accelIdx > 0) optimalRobotCount = tot;
+      }
 
       const ratio = processNodeCount > 0 ? tot / processNodeCount : 0;
       let optimalHint: string;
@@ -797,19 +822,20 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       } else if (ratio <= 1.5) {
         optimalHint = `최적 범위 — 로봇 ${tot}대 / 공정 ${processNodeCount}개 = ${ratio.toFixed(1)}× (권장 1~1.5×)`;
       } else if (ratio <= 2) {
-        optimalHint = `허용 범위 — ${ratio.toFixed(1)}× (권장 초과). 대기 비율 ${Math.round(waitRatio * 100)}%가 높다면 줄이세요`;
+        optimalHint = `허용 범위 — ${ratio.toFixed(1)}× (권장 초과). 대기 비율 ${Math.round(idleRatio * 100)}%가 높다면 줄이세요`;
       } else {
         optimalHint = `과잉 투입 — ${ratio.toFixed(1)}× (상한 2× 초과). 로봇을 ${Math.ceil(processNodeCount * 1.5)}대 이하로 줄이세요`;
       }
 
       newEfficiency = {
-        procUtil: parseFloat(procUtil.toFixed(3)),
-        robotUtil: parseFloat(robotUtil.toFixed(3)),
+        procUtil: parseFloat((procUtil * 100).toFixed(1)),
         avgWaitSec: parseFloat(avgWaitSec.toFixed(2)),
-        idleRatio: parseFloat(idleRatio.toFixed(3)),
-        waitRatio: parseFloat(waitRatio.toFixed(3)),
-        movingRatio: parseFloat(movingRatio.toFixed(3)),
-        procRatio: parseFloat(procRatio.toFixed(3)),
+        idleRatio: parseFloat((idleRatio * 100).toFixed(1)),
+        avgMoveDist,
+        congestionLevel: parseFloat((congestionLevel * 100).toFixed(1)),
+        bottleneckNodeId,
+        bottleneckCongestion: parseFloat((bottleneckCongestion * 100).toFixed(1)),
+        optimalRobotCount,
         optimalHint,
       };
     }

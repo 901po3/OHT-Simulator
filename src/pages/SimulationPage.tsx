@@ -334,38 +334,40 @@ export function SimulationPage() {
           {/* 효율 대시보드 */}
           {efficiency && (
             <div style={{ padding: 12, borderBottom: '1px solid #30363d' }}>
-              <div style={{ fontSize: 10, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-                맵 효율 분석
+              <div style={{ fontSize: 10, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                🎯 맵 효율 & 최적화
               </div>
-              {/* 상태 분포 바 */}
-              <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', height: 18, marginBottom: 8 }}>
+              {/* 핵심 3가지 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
                 {[
-                  { ratio: efficiency.movingRatio, color: '#58a6ff', label: '이동' },
-                  { ratio: efficiency.procRatio, color: '#3fb950', label: '공정' },
-                  { ratio: efficiency.waitRatio, color: '#d29922', label: '대기' },
-                  { ratio: efficiency.idleRatio, color: '#8b949e', label: '유휴' },
-                ].filter(s => s.ratio > 0.01).map(s => (
-                  <div key={s.label} title={`${s.label} ${Math.round(s.ratio * 100)}%`}
-                    style={{ flex: s.ratio, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, minWidth: s.ratio > 0.08 ? 0 : undefined }}>
-                    {s.ratio > 0.08 ? `${Math.round(s.ratio * 100)}%` : ''}
-                  </div>
-                ))}
-              </div>
-              {/* 핵심 지표 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                {[
-                  { label: '로봇 활동률', value: `${Math.round(efficiency.robotUtil * 100)}%`, color: efficiency.robotUtil > 0.6 ? '#3fb950' : '#d29922' },
-                  { label: '공정 노드 가동', value: `${Math.round(efficiency.procUtil * 100)}%`, color: efficiency.procUtil > 0.5 ? '#3fb950' : '#8b949e' },
+                  { label: '공정 가동률', val: efficiency.procUtil, unit: '%', color: efficiency.procUtil > 60 ? '#3fb950' : '#d29922' },
+                  { label: '평균 대기', val: efficiency.avgWaitSec, unit: '초', color: efficiency.avgWaitSec < 3 ? '#3fb950' : '#f85149' },
+                  { label: '유휴 비율', val: efficiency.idleRatio, unit: '%', color: efficiency.idleRatio < 40 ? '#3fb950' : '#d29922' },
                 ].map(m => (
-                  <div key={m.label} style={{ background: '#21262d', borderRadius: 4, padding: '5px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: m.color, fontFamily: 'monospace' }}>{m.value}</div>
-                    <div style={{ fontSize: 9, color: '#8b949e' }}>{m.label}</div>
+                  <div key={m.label} style={{ background: '#21262d', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: m.color, fontFamily: 'monospace' }}>{m.val}</div>
+                    <div style={{ fontSize: 8, color: '#8b949e' }}>{m.label} {m.unit}</div>
                   </div>
                 ))}
               </div>
+              {/* 맵 점수 */}
+              <div style={{ fontSize: 9, background: '#21262d', borderRadius: 6, padding: '8px', marginBottom: 10, lineHeight: 1.6 }}>
+                <div style={{ color: '#58a6ff', fontWeight: 700, marginBottom: 4 }}>📊 맵 점수</div>
+                <div style={{ color: '#8b949e' }}>
+                  이동거리: {efficiency.avgMoveDist} 칸/로봇<br/>
+                  혼잡도: {efficiency.congestionLevel}%<br/>
+                  {efficiency.bottleneckNodeId && <span>병목: {efficiency.bottleneckNodeId} ({efficiency.bottleneckCongestion}%)</span>}
+                </div>
+              </div>
+              {/* 최적 로봇 수 */}
+              {efficiency.optimalRobotCount > 0 && (
+                <div style={{ fontSize: 9, background: '#3fb950' + '22', borderRadius: 6, padding: '6px', marginBottom: 10, borderLeft: '2px solid #3fb950', color: '#3fb950', fontWeight: 600 }}>
+                  ✓ 처리량 꺾이는 지점: {efficiency.optimalRobotCount}대 투입
+                </div>
+              )}
               {/* 최적 투입 판정 */}
               <div style={{
-                fontSize: 10, lineHeight: 1.6, padding: '6px 8px', borderRadius: 4,
+                fontSize: 10, lineHeight: 1.5, padding: '6px 8px', borderRadius: 6,
                 background: efficiency.optimalHint.includes('최적') ? '#238636' + '22' : efficiency.optimalHint.includes('과잉') ? '#f85149' + '22' : '#21262d',
                 color: efficiency.optimalHint.includes('최적') ? '#3fb950' : efficiency.optimalHint.includes('과잉') ? '#f85149' : '#d29922',
               }}>
