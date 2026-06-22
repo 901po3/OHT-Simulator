@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OHTMap version="1.0.0">
+  <Nodes>
+    <Node id="N01" x="100" y="100" type="Depot" />
+    <Node id="N02" x="200" y="100" type="Deposition" />
+    <Node id="N03" x="300" y="150" type="Exposure" />
+    <Node id="N04" x="250" y="300" type="Etching" />
+    <Node id="N05" x="150" y="300" type="Cleaning" />
+    <Node id="N06" x="50" y="200" type="Normal" />
+  </Nodes>
+  <Edges>
+    <Edge id="E01" from="N01" to="N02" weight="10" />
+    <Edge id="E02" from="N02" to="N03" weight="10" />
+    <Edge id="E03" from="N03" to="N04" weight="15" />
+    <Edge id="E04" from="N04" to="N05" weight="15" />
+    <Edge id="E05" from="N05" to="N06" weight="10" />
+    <Edge id="E06" from="N06" to="N01" weight="10" />
+  </Edges>
+</OHTMap>

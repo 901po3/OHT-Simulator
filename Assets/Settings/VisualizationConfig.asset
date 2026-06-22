@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43c9fe81c5913374c83476e28685687b, type: 3}
+  m_Name: VisualizationConfig
+  m_EditorClassIdentifier: Assembly-CSharp::OHTSim.Visualization3D.VisualizationConfig
+  mapScale: 0.05
+  nodeSeparationMultiplier: 2.5
+  robotBaseSpeed: 2
+  robotRotationSpeed: 540
+  robotHoverHeight: 1.2
+  initialRobotCount: 12
+  initialSpeedMultiplier: 1
+  maxRobotCount: 100
+  cameraInitialHeight: 6
+  cameraInitialDistance: 10
+  cameraOrbitSpeed: 100
+  cameraZoomSpeed: 5
+  cameraPanSpeed: 8
+  minimapSize: {x: 220, y: 220}
+  minimapMargin: {x: 20, y: 20}
+  minimapOrthoSizeFallback: 30
+  topViewMinOrtho: 5
+  topViewMaxOrtho: 80
+  topViewZoomStep: 3
+  topViewPanSpeed: 30

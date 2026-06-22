@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dee0b2635c1e978408c577a77f49607d, type: 3}
+  m_Name: NodePrefabRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::OHTSim.Visualization3D.NodePrefabRegistry
+  entries:
+  - nodeType: 0
+    prefab: {fileID: 6229798036194896033, guid: 6a46148b19b3c2a428d743ee70e67b33, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  - nodeType: 1
+    prefab: {fileID: 6144544560296869725, guid: 80deab18d93f0b442bdb3896bec38c87, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  - nodeType: 2
+    prefab: {fileID: 5806115081386743694, guid: 786cbeb0e5d670847866a48679e89fd6, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  - nodeType: 3
+    prefab: {fileID: 1983750961158905081, guid: 7759025a955ad7a4d9e1857ebb35dcdf, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  - nodeType: 4
+    prefab: {fileID: 7635789722715870338, guid: 65744fb35d826cf4ea7ac7a99686175c, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  - nodeType: 5
+    prefab: {fileID: 8664860272755063241, guid: 7d23238c75c5c8f4ca51a24ff09ea807, type: 3}
+    showLabel: 1
+    rotationOffset: {x: 0, y: 0, z: 0}
+  fallbackPrefab: {fileID: 6229798036194896033, guid: 6a46148b19b3c2a428d743ee70e67b33, type: 3}
+  railSegmentPrefab: {fileID: 4644966679150021076, guid: 048bee44b9e23da4da8c1f0cc61ae0d3, type: 3}
+  railWidth: 0.6
+  railHeight: 0.08
