@@ -1,6 +1,6 @@
 ---
 name: oht-unity3d
-description: OHT-System Unity 3D Visualization 레이어 작업 가이드. Use when the user works on Unity 3D scene setup, prefab authoring, ScriptableObject configuration, runtime robot/speed controls, third-person camera, minimap, or any Visualization3D namespace code under "My project/Assets/Scripts/Visualization3D/".
+description: OHT-System Unity 3D Visualization 레이어 작업 가이드. Use when the user works on Unity 3D scene setup, prefab authoring, ScriptableObject configuration, runtime robot/speed controls, third-person camera, minimap, or any Visualization3D namespace code under "Assets/Scripts/Visualization3D/".
 ---
 
 # OHT Unity 3D Visualization Skill
@@ -12,7 +12,7 @@ description: OHT-System Unity 3D Visualization 레이어 작업 가이드. Use w
 
 | 영역 | 위치 | 비고 |
 |------|------|------|
-| 3D 코드 | `My project/Assets/Scripts/Visualization3D/` | OHTSim.Visualization3D 네임스페이스 |
+| 3D 코드 | `Assets/Scripts/Visualization3D/` | OHTSim.Visualization3D 네임스페이스 |
 | 셋업 문서 | `docs/unity/Visualization3D_Setup.md` | 씬·프리팹·SO 작업 |
 | 핸드오프 | `docs/unity/HandoffToUnity.md` | XML 포맷 (불변) |
 | ScriptableObjects | `Assets/Resources/OHT3D/` | VisualizationConfig, NodePrefabRegistry |
