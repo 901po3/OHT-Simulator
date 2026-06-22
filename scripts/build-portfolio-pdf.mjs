@@ -19,12 +19,12 @@ const css = `
   h3 { font-size: 13pt; color: #1e40af; margin-top: 1.2em; }
   h4 { font-size: 11.5pt; color: #334155; }
   p, li { font-size: 11pt; }
-  code { font-family: "Consolas", "D2Coding", monospace; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-size: 9.5pt; }
+  code { font-family: "Consolas", "D2Coding", "Malgun Gothic", "Noto Sans CJK KR", monospace; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-size: 9.5pt; }
   pre { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 9pt; line-height: 1.4; page-break-inside: avoid; }
   pre code { background: transparent; color: inherit; padding: 0; }
   table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
   th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
-  th { background: #e0e7ff; color: #1e3a8a; font-weight: 600; }
+  th { background: #e0e7ff; color: #1e3a8a; font-weight: 600; white-space: nowrap; }
   tr:nth-child(even) td { background: #f8fafc; }
   blockquote { border-left: 4px solid #2563eb; padding-left: 12px; color: #475569; margin: 10px 0; }
   hr { border: none; border-top: 1px solid #cbd5e1; margin: 1.5em 0; }

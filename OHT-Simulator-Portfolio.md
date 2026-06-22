@@ -180,7 +180,7 @@
 
 ```typescript
 // TypeScript (웹)
-export function priorityAStar(from: RailNode, to: RailNode, ...): Path
+export function priorityAStar(from: RailNode, to: RailNode, congestion: Map<string, number>): Path
 ```
 
 ```csharp
