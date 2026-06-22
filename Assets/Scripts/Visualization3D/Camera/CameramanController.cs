@@ -23,6 +23,14 @@ namespace OHTSim.Visualization3D
         public float followHeight = 1.3f;
         public float lookDamping = 15f;
 
+        [Header("수직 이동")]
+        public float verticalSpeed = 5f;
+        public float minHoverHeight = 0.5f;
+        public float maxHoverHeight = 15f;
+
+        [Header("키보드 회전")]
+        public float keyboardTurnSpeed = 90f;  // 도/초
+
         private GameObject _droneAvatar;
         private Camera _cam;
         private CameraModeController _modeController;
@@ -32,6 +40,13 @@ namespace OHTSim.Visualization3D
         private float _pitch = 15f;
         private float _bobTimer = 0f;
         private bool _isFirstPerson = false;
+
+        // 베이스 호버 높이(수직 이동으로 변화). bobbing은 이 값에 더해진다
+        private float _baseHoverHeight = 1.7f;
+
+        // 부드러운 뱅킹(롤) 연출용 상태
+        private float _currentRoll = 0f;
+        private float _yawPrev = 0f;
 
         private void Awake()
         {
@@ -44,6 +59,9 @@ namespace OHTSim.Visualization3D
             EnsureModeController();
             SimEvents.CameraModeChanged += HandleCameraModeChanged;
             SimEvents.MapBuilt          += HandleMapBuilt;
+
+            // 베이스 호버 높이는 인스펙터의 hoverHeight 초기값으로 동기화
+            _baseHoverHeight = hoverHeight;
 
             // 드론 아바타를 프로그래밍 방식으로 제작 (Low-poly Sci-fi 스타일)
             CreateDroneAvatar();
@@ -94,6 +112,8 @@ namespace OHTSim.Visualization3D
                 
                 _droneAvatar.transform.rotation = GetSafeCameraLookRotation();
                 _yaw = _droneAvatar.transform.eulerAngles.y;
+                _yawPrev = _yaw;
+                _currentRoll = 0f;
                 _pitch = 15f;
             }
         }
@@ -111,7 +131,12 @@ namespace OHTSim.Visualization3D
                 _droneAvatar.transform.rotation = GetSafeCameraLookRotation();
 
                 _yaw = _droneAvatar.transform.eulerAngles.y;
+                _yawPrev = _yaw;
+                _currentRoll = 0f;
                 _pitch = 15f;
+
+                // 베이스 호버 높이를 초기값으로 재설정 (Cameraman 진입 시 깔끔한 출발)
+                _baseHoverHeight = Mathf.Clamp(hoverHeight, minHoverHeight, maxHoverHeight);
 
                 // 마우스 잠금 및 감춤
                 Cursor.lockState = CursorLockMode.Locked;
@@ -136,13 +161,13 @@ namespace OHTSim.Visualization3D
                 // 만약 맵 바운드가 비어 있다면 월드 원점으로 예방 세팅
                 if (b.size.sqrMagnitude < 0.1f)
                 {
-                    return new Vector3(0, hoverHeight, 0);
+                    return new Vector3(0, _baseHoverHeight, 0);
                 }
                 Vector3 center = b.center;
-                center.y = hoverHeight;
+                center.y = _baseHoverHeight;
                 return center;
             }
-            return new Vector3(0, hoverHeight, 0);
+            return new Vector3(0, _baseHoverHeight, 0);
         }
 
         private void Update()
@@ -192,9 +217,41 @@ namespace OHTSim.Visualization3D
 
             _yaw += mouseX;
             _pitch -= mouseY;
-            _pitch = Mathf.Clamp(_pitch, -45f, 75f);
 
-            _droneAvatar.transform.rotation = Quaternion.Euler(0, _yaw, 0);
+            // ── 1-b. 키보드 회전 (Q/E - 마우스 보조, 신규/구형 인풋 멀티 호환) ──
+            float keyTurn = 0f;
+            bool upKey = false;
+            bool downKey = false;
+#if ENABLE_INPUT_SYSTEM
+            var kbTurn = UnityEngine.InputSystem.Keyboard.current;
+            if (kbTurn != null)
+            {
+                if (kbTurn.qKey.isPressed) keyTurn -= 1f;
+                if (kbTurn.eKey.isPressed) keyTurn += 1f;
+                upKey   = kbTurn.spaceKey.isPressed;
+                downKey = kbTurn.leftCtrlKey.isPressed || kbTurn.rightCtrlKey.isPressed;
+            }
+            else
+#endif
+            {
+                if (Input.GetKey(KeyCode.Q)) keyTurn -= 1f;
+                if (Input.GetKey(KeyCode.E)) keyTurn += 1f;
+                upKey   = Input.GetKey(KeyCode.Space);
+                downKey = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            }
+            _yaw += keyTurn * keyboardTurnSpeed * Time.deltaTime;
+
+            // 시점 클램프 완화 (위/아래도 시원하게 볼 수 있도록)
+            _pitch = Mathf.Clamp(_pitch, -80f, 80f);
+
+            // ── 1-c. 부드러운 뱅킹(롤) — 좌/우 회전 시 살짝 기울어지는 Gamer Juice ──
+            float yawDelta = Mathf.DeltaAngle(_yawPrev, _yaw);
+            // yawDelta는 프레임당 도 단위라 그대로 곱하면 너무 작음 → 속도화하여 보강
+            float targetRoll = Mathf.Clamp(-yawDelta * 2f, -25f, 25f);
+            _currentRoll = Mathf.Lerp(_currentRoll, targetRoll, Time.deltaTime * 5f);
+            _yawPrev = _yaw;
+
+            _droneAvatar.transform.rotation = Quaternion.Euler(0, _yaw, _currentRoll);
 
             // ── 2. 키보드 이동 (WASD - 신규/구형 인풋 멀티 호환 연산) ──
             float speed = moveSpeed;
@@ -217,6 +274,9 @@ namespace OHTSim.Visualization3D
             Vector3 moveDir = Vector3.zero;
             Vector3 forward = _droneAvatar.transform.forward;
             Vector3 right = _droneAvatar.transform.right;
+            // forward/right의 Y 성분 제거 — 수평 이동만 (수직은 Space/Ctrl 전용)
+            forward.y = 0f; forward.Normalize();
+            right.y = 0f;   right.Normalize();
 
 #if ENABLE_INPUT_SYSTEM
             if (keyboard != null)
@@ -236,22 +296,35 @@ namespace OHTSim.Visualization3D
             }
 
             // 이동 벡터 적용
+            float tiltAngle = 0f;
             if (moveDir.sqrMagnitude > 0.001f)
             {
                 _droneAvatar.transform.position += moveDir.normalized * speed * Time.deltaTime;
 
                 // 이동 시 앞으로 약간 기울어지는 드론 연출 (Gamer Juice!)
-                float tiltAngle = 10f;
-                _droneAvatar.transform.rotation = Quaternion.Euler(tiltAngle, _yaw, 0);
+                tiltAngle = 10f;
+                _droneAvatar.transform.rotation = Quaternion.Euler(tiltAngle, _yaw, _currentRoll);
             }
 
-            // 3. 월드 경계(공장 내벽) 안쪽으로 강제 클램프 (탈출 방지)
+            // ── 2-b. 수직 이동 (Space: 상승 / LeftCtrl: 하강) ──
+            float vertical = 0f;
+            if (upKey)   vertical += 1f;
+            if (downKey) vertical -= 1f;
+            if (Mathf.Abs(vertical) > 0.001f)
+            {
+                float vSpeed = verticalSpeed * (shiftPressed ? sprintSpeedMultiplier : 1f);
+                _baseHoverHeight = Mathf.Clamp(
+                    _baseHoverHeight + vertical * vSpeed * Time.deltaTime,
+                    minHoverHeight, maxHoverHeight);
+            }
+
+            // 3. 월드 경계(공장 내벽) 안쪽으로 강제 클램프 (X/Z만; Y는 별도 클램프)
             ClampToFactoryBounds();
 
-            // 4. 호버링 위아래 흔들림 (Bobbing)
+            // 4. 호버링 위아래 흔들림 (Bobbing) — 베이스 높이에 더해진다
             _bobTimer += Time.deltaTime * hoverBobSpeed;
             var pos = _droneAvatar.transform.position;
-            pos.y = hoverHeight + Mathf.Sin(_bobTimer) * hoverBobAmount;
+            pos.y = _baseHoverHeight + Mathf.Sin(_bobTimer) * hoverBobAmount;
             _droneAvatar.transform.position = pos;
 
             // 5. 마우스 휠로 1인칭 <-> 3인칭 전환
@@ -393,6 +466,27 @@ namespace OHTSim.Visualization3D
             light.intensity = 4.5f;
             light.range = 15f;
             light.spotAngle = 45f;
+        }
+
+        private void OnGUI()
+        {
+            if (!_active) return;
+
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 12,
+                normal = { textColor = new Color(0.7f, 0.9f, 1f, 0.9f) },
+            };
+
+            GUI.Box(new Rect(10, Screen.height - 130, 230, 120), "");
+            GUI.Label(new Rect(20, Screen.height - 125, 220, 110),
+                "카메라 컨트롤\n" +
+                "WASD: 이동\n" +
+                "Space/Ctrl: 상승/하강\n" +
+                "Q/E: 좌/우 회전\n" +
+                "Mouse: 시점 (휠: 1/3인칭)\n" +
+                "Shift: 가속  |  ESC: 종료",
+                style);
         }
     }
 }
