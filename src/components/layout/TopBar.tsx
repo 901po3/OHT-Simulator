@@ -66,24 +66,38 @@ export function TopBar() {
       </span>
 
       {/* 탭 네비게이션 */}
-      {NAV_ITEMS.map(({ to, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          style={({ isActive }) => ({
-            padding: '6px 14px',
-            borderRadius: 6,
-            textDecoration: 'none',
-            fontSize: 13,
-            fontWeight: isActive ? 600 : 400,
-            color: isActive ? '#e6edf3' : '#8b949e',
-            background: isActive ? '#21262d' : 'transparent',
-            transition: 'all 0.15s',
-          })}
-        >
-          {label}
-        </NavLink>
-      ))}
+      <div style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        minWidth: 0,
+        flex: '1 1 auto',
+        overflow: 'hidden',
+      }}>
+        {NAV_ITEMS.map(({ to, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            title={label}
+            style={({ isActive }) => ({
+              padding: '6px 14px',
+              borderRadius: 6,
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? '#e6edf3' : '#8b949e',
+              background: isActive ? '#21262d' : 'transparent',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flexShrink: 0,
+            })}
+          >
+            {label}
+          </NavLink>
+        ))}
+      </div>
 
       {/* 우측 액션 */}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
