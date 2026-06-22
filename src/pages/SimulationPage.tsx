@@ -14,14 +14,45 @@ const STATE_COLOR: Record<string, string> = {
   Processing: '#3fb950',
 };
 
+// 처리량 스파크라인 (작은 라인 차트)
+function Sparkline({ data, color, height = 44 }: { data: number[]; color: string; height?: number }) {
+  const w = 210, h = height, pad = 3;
+  if (data.length < 2) {
+    return (
+      <div style={{ height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#444c56' }}>
+        데이터 수집 중…
+      </div>
+    );
+  }
+  const max = Math.max(...data, 0.0001);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const stepX = (w - pad * 2) / (data.length - 1);
+  const xy = (v: number, i: number) => {
+    const x = pad + i * stepX;
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    return [x, y] as const;
+  };
+  const pts = data.map((v, i) => xy(v, i).join(',')).join(' ');
+  const [lx, ly] = xy(data[data.length - 1], data.length - 1);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: h, display: 'block' }}>
+      <polygon points={`${pad},${h - pad} ${pts} ${lx},${h - pad}`} fill={color} opacity={0.12} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.6} />
+      <circle cx={lx} cy={ly} r={2.6} fill={color} />
+    </svg>
+  );
+}
+
 export function SimulationPage() {
   const navigate = useNavigate();
   const { nodes, edges } = useEditorStore();
   const {
     running, algorithmId, agentCount, speed, stats, autoDispatch, agents,
     stallReport, overcrowdWarning,
+    selectedAgentId, throughputHistory, agentRateHistory,
     startSim, stopSim, setAlgorithm, setAgentCount, setSpeed, setAutoDispatch, tick,
-    dismissStallReport,
+    setSelectedAgent, dismissStallReport,
   } = useSimRunStore();
 
   const rafRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -243,48 +274,108 @@ export function SimulationPage() {
             ))}
             {depotCount > 0 && (
               <div style={{ fontSize: 10, color: '#8b949e', marginTop: 4 }}>
-                차고지 {depotCount}개 · 1초당 1대 스폰 · 현재 {agents.length}대 운행
+                차고지 {depotCount}개 · 현재 {agents.length}대 운행
               </div>
             )}
           </div>
 
+          {/* 처리량 차트 — 전체 평균 또는 선택 로봇 */}
+          {(() => {
+            const sel = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : null;
+            let series: number[];
+            let curr: number, avg: number, title: string, color: string;
+            if (sel) {
+              const hist = (agentRateHistory.get(sel.id) ?? []).map(s => s.rate);
+              series = hist;
+              curr = hist.length ? hist[hist.length - 1] : 0;
+              const lifeMin = Math.max(stats.elapsedSec - sel.spawnElapsed, 0.001) / 60;
+              avg = sel.totalJobs / lifeMin;
+              title = `${sel.id} 처리량`;
+              color = sel.color;
+            } else {
+              series = throughputHistory.map(s => s.perRobot);
+              curr = series.length ? series[series.length - 1] : 0;
+              avg = series.length ? series.reduce((s, v) => s + v, 0) / series.length : 0;
+              title = '로봇당 평균 처리량';
+              color = '#3fb950';
+            }
+            return (
+              <div style={{ padding: 12, borderBottom: '1px solid #30363d' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {title}
+                  </span>
+                  {sel && (
+                    <button onClick={() => setSelectedAgent(null)}
+                      style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, cursor: 'pointer',
+                        border: '1px solid #30363d', background: '#21262d', color: '#8b949e' }}>
+                      전체 평균 보기
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 6 }}>
+                  <div>
+                    <span style={{ fontSize: 22, fontWeight: 700, color, fontFamily: 'monospace' }}>{curr.toFixed(1)}</span>
+                    <span style={{ fontSize: 10, color: '#8b949e' }}> 작업/분 · 현재</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#8b949e', fontFamily: 'monospace' }}>{avg.toFixed(1)}</span>
+                    <span style={{ fontSize: 10, color: '#8b949e' }}> 평균</span>
+                  </div>
+                </div>
+                <Sparkline data={series} color={color} />
+                <div style={{ fontSize: 9, color: '#444c56', marginTop: 4 }}>
+                  {sel ? '로봇 1대의 분당 완료 공정 추이' : '로봇을 클릭하면 개별 추이를 봅니다 · 로봇당(전체÷대수) 분당 공정'}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* OHT 상태 목록 */}
           <div style={{ padding: '12px 12px 0', overflowY: 'auto', flex: 1 }}>
             <div style={{ fontSize: 10, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-              OHT 상태
+              OHT 상태 <span style={{ color: '#444c56', fontWeight: 400, textTransform: 'none' }}>· 클릭해 처리량 보기</span>
             </div>
             {agents.length === 0 && (
               <div style={{ fontSize: 12, color: '#444c56' }}>
                 {running ? '로봇 스폰 대기 중...' : '시뮬레이션 시작 후 표시'}
               </div>
             )}
-            {agents.map(a => (
-              <div key={a.id} style={{
-                background: '#21262d',
-                border: '1px solid #30363d',
-                borderLeft: `3px solid ${a.color}`,
-                borderRadius: 6,
-                padding: '7px 9px',
-                marginBottom: 5,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: '#e6edf3', fontWeight: 600 }}>{a.id}</span>
-                  <span style={{
-                    fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                    background: (STATE_COLOR[a.state] ?? '#8b949e') + '22',
-                    color: STATE_COLOR[a.state] ?? '#8b949e',
+            {agents.map(a => {
+              const isSel = a.id === selectedAgentId;
+              const lifeMin = Math.max(stats.elapsedSec - a.spawnElapsed, 0.001) / 60;
+              const avgRate = a.totalJobs / lifeMin;
+              return (
+                <div key={a.id}
+                  onClick={() => setSelectedAgent(isSel ? null : a.id)}
+                  style={{
+                    background: isSel ? a.color + '1f' : '#21262d',
+                    border: `1px solid ${isSel ? a.color : '#30363d'}`,
+                    borderLeft: `3px solid ${a.color}`,
+                    borderRadius: 6,
+                    padding: '7px 9px',
+                    marginBottom: 5,
+                    cursor: 'pointer',
                   }}>
-                    {a.state}
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#e6edf3', fontWeight: 600 }}>{a.id}</span>
+                    <span style={{
+                      fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                      background: (STATE_COLOR[a.state] ?? '#8b949e') + '22',
+                      color: STATE_COLOR[a.state] ?? '#8b949e',
+                    }}>
+                      {a.state}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: a.recalling ? '#f85149' : '#58a6ff', marginTop: 3 }}>
+                    {a.recalling ? '↩ 차고지 귀환 중' : `다음: ${PROCESS_CYCLE[a.processStage % 4]} 공정`}
+                  </div>
+                  <div style={{ fontSize: 9, color: '#444c56', marginTop: 1 }}>
+                    이동 {a.totalDistance}칸 · 완료 {a.totalJobs}건 · <span style={{ color: a.color }}>{avgRate.toFixed(1)}/분</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 10, color: a.recalling ? '#f85149' : '#58a6ff', marginTop: 3 }}>
-                  {a.recalling ? '↩ 차고지 귀환 중' : `다음: ${PROCESS_CYCLE[a.processStage % 4]} 공정`}
-                </div>
-                <div style={{ fontSize: 9, color: '#444c56', marginTop: 1 }}>
-                  이동 {a.totalDistance}칸 · 완료 {a.totalJobs}건
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 맵 정보 */}

@@ -202,9 +202,69 @@ export function MapDesignPage() {
           </Card>
         </section>
 
-        {/* § 4 프리셋 비교 */}
+        {/* § 4 적정 로봇 투입량 */}
         <section>
-          <SectionTitle>§ 4. 맵 프리셋 비교</SectionTitle>
+          <SectionTitle>§ 4. 적정 로봇 투입량 — 공정 노드당 몇 대?</SectionTitle>
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 20 }}>
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ fontSize: 40, fontWeight: 800, color: '#3fb950', fontFamily: 'monospace', lineHeight: 1 }}>≈ 1.5</div>
+                <div style={{ fontSize: 12, color: '#8b949e', marginTop: 6 }}>대 / 공정 노드</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <p style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.85, margin: 0 }}>
+                  병목은 <strong style={{ color: '#e6edf3' }}>공정 노드의 처리 시간</strong>입니다. 한 노드는 1.5초에 1건만 처리하므로,
+                  공정 노드 수보다 로봇이 많아도 처리량은 늘지 않고 통행 혼잡만 커집니다. 노드 1개당
+                  <strong style={{ color: '#3fb950' }}> 처리 중 1대 + 진입 대기 1대</strong> 정도가 이상적입니다.
+                </p>
+              </div>
+            </div>
+
+            {/* 밀도 게이지 */}
+            <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', height: 34, fontSize: 11, fontWeight: 700 }}>
+              {[
+                { label: '과소', sub: '< 1×', flex: 30, bg: '#30363d', fg: '#8b949e' },
+                { label: '권장', sub: '1 ~ 1.5×', flex: 25, bg: '#238636', fg: '#fff' },
+                { label: '허용', sub: '1.5 ~ 2×', flex: 22, bg: '#9e6a03', fg: '#fff' },
+                { label: '과잉', sub: '> 2×', flex: 33, bg: '#7d2622', fg: '#fdaba6' },
+              ].map(z => (
+                <div key={z.label} style={{ flex: z.flex, background: z.bg, color: z.fg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.2 }}>
+                  <span>{z.label}</span>
+                  <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.9 }}>{z.sub}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#444c56', marginTop: 4 }}>
+              <span>공정 노드가 놀아 처리량 손실</span>
+              <span>혼잡만 증가 · 비용 낭비</span>
+            </div>
+
+            {/* 프리셋별 권장 대수 */}
+            <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              {[
+                { name: '소형', proc: 4, rec: '4~6대', color: '#58a6ff' },
+                { name: '중형', proc: 8, rec: '8~12대', color: '#ffa657' },
+                { name: '대형', proc: 12, rec: '12~18대', color: '#bc8cff' },
+                { name: '초대형 팹', proc: 72, rec: '70~100대', color: '#39d353' },
+              ].map(p => (
+                <div key={p.name} style={{ background: '#21262d', borderRadius: 8, padding: '12px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: p.color }}>{p.name}</div>
+                  <div style={{ fontSize: 9, color: '#444c56', margin: '3px 0' }}>공정 {p.proc}개</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3', fontFamily: 'monospace' }}>{p.rec}</div>
+                </div>
+              ))}
+            </div>
+            <blockquote style={{ borderLeft: '3px solid #3fb950', paddingLeft: 16, margin: '18px 0 0', fontSize: 12, color: '#8b949e', lineHeight: 1.8 }}>
+              공식: <strong style={{ color: '#e6edf3' }}>최적 로봇 ≈ 공정 노드 수 × 1.5</strong> (상한 ×2).
+              시뮬레이션 우측 패널의 <strong style={{ color: '#3fb950' }}>"로봇당 평균 처리량"</strong> 그래프로 이 지점을 직접 확인할 수 있습니다 —
+              로봇을 권장치 이상으로 늘리면 로봇당 처리량 곡선이 꺾여 내려갑니다.
+            </blockquote>
+          </Card>
+        </section>
+
+        {/* § 5 프리셋 비교 */}
+        <section>
+          <SectionTitle>§ 5. 맵 프리셋 비교</SectionTitle>
           <Card style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.7fr 0.8fr 1fr 1.6fr', fontSize: 12 }}>
               {['프리셋', '노드', '연결', '공정 노드', '용도'].map(h => (
@@ -227,9 +287,9 @@ export function MapDesignPage() {
           </p>
         </section>
 
-        {/* § 5 안티패턴 */}
+        {/* § 6 안티패턴 */}
         <section>
-          <SectionTitle>§ 5. 피해야 할 맵 안티패턴</SectionTitle>
+          <SectionTitle>§ 6. 피해야 할 맵 안티패턴</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {ANTIPATTERNS.map(a => (
               <div key={a.bad} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: '14px 18px' }}>

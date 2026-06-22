@@ -62,7 +62,15 @@ export interface SimAgent {
   blockedSec: number;   // Moving 중 차단된 누적 시간 → 재경로 탐색 트리거
   idleCooldown: number; // 블록 후 Idle 복귀 시 재계획 대기 시간 (랜덤 분산)
   recalling: boolean; // 차고지 귀환 중 — 도착 시 제거
+  spawnElapsed: number; // 스폰 시점의 경과 시간 → 로봇별 평균 처리량 계산용
 }
+
+// ── 처리량 메트릭 ──────────────────────────────────────
+export interface ThroughputSample { t: number; perRobot: number; total: number }
+export interface AgentRateSample { t: number; rate: number }
+const SAMPLE_SEC        = 1.5; // 처리량 샘플링 주기 (초)
+const MAX_SAMPLES       = 80;  // 전체 시계열 길이
+const MAX_AGENT_SAMPLES = 40;  // 로봇별 시계열 길이
 
 // ── 스톨 리포트 ────────────────────────────────────────
 export type StallCause =
@@ -290,12 +298,22 @@ interface SimRunState {
   stallSinceSec: number; // 마지막 completedJobs 이후 초
   overcrowdWarning: string | null; // 로봇 과잉 투입 경고
 
+  // 처리량 메트릭
+  selectedAgentId: string | null;            // 클릭 선택된 로봇 (null = 전체 평균)
+  throughputHistory: ThroughputSample[];      // 전체 처리량 시계열
+  agentRateHistory: Map<string, AgentRateSample[]>; // 로봇별 처리량 시계열
+  _sampleAccum: number;
+  _lastSampleElapsed: number;
+  _lastTotalJobs: number;
+  _lastAgentJobs: Map<string, number>;
+
   startSim: (eNodes: EditorNode[], eEdges: EditorEdge[]) => void;
   stopSim: () => void;
   setAlgorithm: (id: AlgorithmId) => void;
   setAgentCount: (n: number) => void;
   setSpeed: (s: number) => void;
   setAutoDispatch: (v: boolean) => void;
+  setSelectedAgent: (id: string | null) => void;
   dismissStallReport: () => void;
   tick: (dt: number) => void;
 }
@@ -317,6 +335,14 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
   stallSinceSec: 0,
   overcrowdWarning: null,
 
+  selectedAgentId: null,
+  throughputHistory: [],
+  agentRateHistory: new Map(),
+  _sampleAccum: 0,
+  _lastSampleElapsed: 0,
+  _lastTotalJobs: 0,
+  _lastAgentJobs: new Map(),
+
   startSim(eNodes, eEdges) {
     const graph = buildRuntimeGraph(eNodes, eEdges);
     const allNodes = [...graph.values()];
@@ -334,6 +360,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       currentNode: node, nextNode: null, path: [], pathIndex: 0, progress: 0,
       state: 'Idle', stateTimer: 0, processStage: (seq - 1) % 4, // 스테이지 순환 배정으로 초기 분산
       totalDistance: 0, totalJobs: 0, blockedSec: 0, idleCooldown: 0, recalling: false,
+      spawnElapsed: 0,
     });
 
     if (depots.length === 0) {
@@ -348,6 +375,8 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       congestion: new Map(), stallReport: null, stallSinceSec: 0,
       overcrowdWarning: null,
       stats: { completedJobs: 0, totalDistance: 0, elapsedSec: 0, distPerSec: 0 },
+      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(),
+      _sampleAccum: 0, _lastSampleElapsed: 0, _lastTotalJobs: 0, _lastAgentJobs: new Map(),
     });
   },
 
@@ -355,6 +384,8 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
     set({
       running: false, agents: [], spawnTimers: new Map(),
       agentSeq: 1, stallReport: null, stallSinceSec: 0, overcrowdWarning: null,
+      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(),
+      _sampleAccum: 0, _lastSampleElapsed: 0, _lastTotalJobs: 0, _lastAgentJobs: new Map(),
     });
   },
 
@@ -382,6 +413,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
   },
   setSpeed: (s) => set({ speed: s }),
   setAutoDispatch: (v) => set({ autoDispatch: v }),
+  setSelectedAgent: (id) => set({ selectedAgentId: id }),
   dismissStallReport: () => set({ stallReport: null, stallSinceSec: 0 }),
 
   tick(dt) {
@@ -389,6 +421,8 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       agents, allNodes, algorithmId, speed, stats,
       agentCount, agentSeq, spawnTimers, autoDispatch,
       stallSinceSec, stallReport,
+      throughputHistory, agentRateHistory,
+      _sampleAccum, _lastSampleElapsed, _lastTotalJobs, _lastAgentJobs,
     } = get();
     if (allNodes.length < 2) return;
 
@@ -446,6 +480,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
             blockedSec: 0,
             idleCooldown: 0,
             recalling: false,
+            spawnElapsed: stats.elapsedSec + dt,
           });
           newSpawnTimers.set(depot.id, elapsed - SPAWN_INTERVAL);
         } else {
@@ -680,6 +715,49 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       };
     }
 
+    // ── 처리량 샘플링 (SAMPLE_SEC 주기) ───────────────────────────────
+    const newTotalJobs   = stats.completedJobs + completedDelta;
+    let sAccum           = _sampleAccum + dt;
+    let newThroughput    = throughputHistory;
+    let newAgentRate     = agentRateHistory;
+    let lastSampleElapsed = _lastSampleElapsed;
+    let lastTotalJobs    = _lastTotalJobs;
+    let lastAgentJobs    = _lastAgentJobs;
+
+    if (sAccum >= SAMPLE_SEC) {
+      const windowDt = elapsed - lastSampleElapsed;
+      if (windowDt > 0) {
+        const activeCount = activeAgents.length;
+        const totalRate = ((newTotalJobs - lastTotalJobs) / windowDt) * 60; // 작업/분
+        const perRobot  = activeCount > 0 ? totalRate / activeCount : 0;
+        newThroughput = [...throughputHistory, {
+          t: parseFloat(elapsed.toFixed(1)),
+          perRobot: parseFloat(perRobot.toFixed(2)),
+          total: parseFloat(totalRate.toFixed(2)),
+        }].slice(-MAX_SAMPLES);
+
+        // 로봇별 처리량
+        newAgentRate = new Map(agentRateHistory);
+        const presentIds = new Set(finalAgents.map(a => a.id));
+        for (const id of [...newAgentRate.keys()]) if (!presentIds.has(id)) newAgentRate.delete(id);
+        const nextAgentJobs = new Map<string, number>();
+        for (const a of finalAgents) {
+          const prev = lastAgentJobs.get(a.id) ?? a.totalJobs; // 신규 로봇은 첫 샘플 0
+          const rate = ((a.totalJobs - prev) / windowDt) * 60;
+          const hist = [...(newAgentRate.get(a.id) ?? []), {
+            t: parseFloat(elapsed.toFixed(1)),
+            rate: parseFloat(Math.max(rate, 0).toFixed(2)),
+          }].slice(-MAX_AGENT_SAMPLES);
+          newAgentRate.set(a.id, hist);
+          nextAgentJobs.set(a.id, a.totalJobs);
+        }
+        lastAgentJobs     = nextAgentJobs;
+        lastTotalJobs     = newTotalJobs;
+        lastSampleElapsed = elapsed;
+      }
+      sAccum = 0;
+    }
+
     set({
       agents: finalAgents,
       agentSeq: nextSeq,
@@ -688,8 +766,14 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       stallReport: newStallRpt,
       stallSinceSec: newStallSec,
       overcrowdWarning: newOvercrowd,
+      throughputHistory: newThroughput,
+      agentRateHistory: newAgentRate,
+      _sampleAccum: sAccum,
+      _lastSampleElapsed: lastSampleElapsed,
+      _lastTotalJobs: lastTotalJobs,
+      _lastAgentJobs: lastAgentJobs,
       stats: {
-        completedJobs: stats.completedJobs + completedDelta,
+        completedJobs: newTotalJobs,
         totalDistance: totalDist,
         elapsedSec: elapsed,
         distPerSec: elapsed > 0 ? parseFloat((totalDist / elapsed).toFixed(2)) : 0,
