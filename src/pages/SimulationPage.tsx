@@ -91,6 +91,29 @@ export function SimulationPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleExportSimulation = () => {
+    const { generateSimulationXML } = require('../core/export/simulationExporter');
+    const xml = generateSimulationXML(
+      [...nodes.values?.() ?? nodes],
+      edges,
+      efficiency?.optimalRobotCount ?? agentCount,
+      efficiency?.avgMoveDist ?? 0,
+      efficiency?.congestionLevel ?? 0,
+      nodes.filter(n => {
+        const type = n.type as string;
+        return ['증착', '노광', '식각', '세정'].includes(type);
+      }).length,
+      algorithmId,
+    );
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oht-simulation-${new Date().toISOString().slice(0, 10)}.xml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleBack = () => {
     stopSim();
     navigate('/editor');
@@ -221,6 +244,17 @@ export function SimulationPage() {
             }}
           >
             {running ? '⏹ 중지' : '▶ 시작'}
+          </button>
+          <button
+            onClick={handleExportSimulation}
+            title="현재 시뮬레이션 데이터를 Unity용 XML로 내보내기"
+            style={{
+              padding: '6px 14px', borderRadius: 6, border: '1px solid #30363d',
+              background: '#21262d', color: '#8b949e', fontWeight: 600, fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            💾 XML 내보내기
           </button>
         </div>
       </div>
