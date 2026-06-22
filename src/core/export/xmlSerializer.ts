@@ -20,12 +20,39 @@ ${edgeLines}
 </OHTMap>`;
 }
 
+/**
+ * XML을 파일로 다운로드합니다.
+ *
+ * @param xml XML 콘텐츠 문자열
+ * @param filename 저장할 파일명 (확장자 포함, 예: "map.xml")
+ *
+ * 사용 예:
+ *   const xml = exportToXml(nodes, edges);
+ *   downloadXml(xml, 'my-custom-map.xml');
+ *
+ * 경로 안내:
+ *   Assets/StreamingAssets/Maps/{filename}
+ */
 export function downloadXml(xml: string, filename = 'oht_map.xml') {
-  const blob = new Blob([xml], { type: 'application/xml' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = filename;
-  a.click();
+  // 파일명에 .xml 확장자가 없으면 추가
+  const finalFilename = filename.endsWith('.xml') ? filename : `${filename}.xml`;
+
+  const blob = new Blob([xml], { type: 'application/xml; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = finalFilename;
+
+  // 다운로드 트리거 (모던 브라우저 대응)
+  if (document.body.contains(link)) {
+    link.click();
+  } else {
+    // IE 또는 구형 브라우저 대응
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // 메모리 정리
   URL.revokeObjectURL(url);
 }

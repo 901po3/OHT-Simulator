@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { exportToXml, downloadXml } from '../../core/export/xmlSerializer';
+import { FileNameDialog } from '../dialogs/FileNameDialog';
 
 // 공정 페이지는 마지막 순서 — 개인 참고용 부록 성격
 const NAV_ITEMS = [
@@ -29,10 +30,23 @@ export function TopBar() {
   const { nodes, edges, undo, redo, canUndo, canRedo } = useEditorStore();
   const location = useLocation();
   const isEditor = location.pathname === '/editor';
+  const [showFileDialog, setShowFileDialog] = useState(false);
 
-  const handleExport = () => {
+  const handleOpenFileDialog = () => {
+    setShowFileDialog(true);
+  };
+
+  const handleExportWithName = (fileName: string) => {
     const xml = exportToXml(nodes, edges);
-    downloadXml(xml);
+    downloadXml(xml, `${fileName}.xml`);
+    setShowFileDialog(false);
+
+    // 성공 메시지 표시
+    showExportSuccessMessage(fileName);
+  };
+
+  const handleCancelDialog = () => {
+    setShowFileDialog(false);
   };
 
   return (
@@ -99,7 +113,7 @@ export function TopBar() {
 
         {isEditor && (
           <button
-            onClick={handleExport}
+            onClick={handleOpenFileDialog}
             title="맵을 XML로 내보내기 (Unity 호환)"
             style={{
               padding: '5px 14px',
@@ -118,6 +132,21 @@ export function TopBar() {
           </button>
         )}
       </div>
+
+      {/* 파일명 입력 다이얼로그 */}
+      <FileNameDialog
+        isOpen={showFileDialog}
+        onConfirm={handleExportWithName}
+        onCancel={handleCancelDialog}
+      />
     </header>
   );
+}
+
+// 내보내기 성공 메시지 표시 (toast 또는 alert)
+function showExportSuccessMessage(fileName: string) {
+  const message = `✅ ${fileName}.xml 다운로드됨!\n\n📁 저장 경로:\nAssets/StreamingAssets/Maps/${fileName}.xml\n\n💡 Unity 에디터에서 이 경로에 파일을 복사한 후\n에디터를 재시작하면 자동 인식됩니다.`;
+
+  // 간단한 alert 사용 (또는 toast 라이브러리로 개선 가능)
+  alert(message);
 }
