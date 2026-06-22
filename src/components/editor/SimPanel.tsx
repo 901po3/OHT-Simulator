@@ -1,9 +1,14 @@
 import React from 'react';
 import { useSimRunStore } from '../../store/simRunStore';
 import { useEditorStore } from '../../store/editorStore';
-import { ALGORITHM_META, type AlgorithmId } from '../../core/pathfinding/algorithms';
+import { ALGORITHM_META, ALGORITHM_ORDER, type AlgorithmId } from '../../core/pathfinding/algorithms';
 
-const ALGO_IDS: AlgorithmId[] = ['standard', 'dijkstra', 'greedy', 'stochastic', 'priority', 'cbs'];
+const STATUS_BADGE: Record<string, { label: string; color: string }> = {
+  recommended: { label: '권장', color: '#3fb950' },
+  good:        { label: '우수', color: '#58a6ff' },
+  fair:        { label: '보통', color: '#8b949e' },
+  caution:     { label: '주의', color: '#f85149' },
+};
 
 const sliderLabel: React.CSSProperties = {
   fontSize: 12,
@@ -121,9 +126,10 @@ export function SimPanel({ onClose }: { onClose: () => void }) {
             길찾기 알고리즘
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ALGO_IDS.map(id => {
+            {ALGORITHM_ORDER.map((id, idx) => {
               const meta = ALGORITHM_META[id];
               const isSelected = algorithmId === id;
+              const badge = STATUS_BADGE[meta.status];
               return (
                 <button
                   key={id}
@@ -139,10 +145,19 @@ export function SimPanel({ onClose }: { onClose: () => void }) {
                     fontSize: 12,
                     fontWeight: isSelected ? 700 : 400,
                     transition: 'all 0.15s',
+                    opacity: meta.status === 'caution' ? 0.75 : 1,
                   }}
                 >
-                  <div>{meta.label}</div>
-                  <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{meta.desc}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: '#444c56', fontFamily: 'monospace' }}>#{idx + 1}</span>
+                    <span>{meta.label}</span>
+                    <span style={{
+                      marginLeft: 'auto', fontSize: 9, padding: '1px 5px',
+                      borderRadius: 3, background: badge.color + '22', color: badge.color,
+                      border: `1px solid ${badge.color}44`, fontWeight: 700,
+                    }}>{badge.label}</span>
+                  </div>
+                  <div style={{ fontSize: 10, opacity: 0.65, marginTop: 3 }}>{meta.desc}</div>
                 </button>
               );
             })}
@@ -155,13 +170,12 @@ export function SimPanel({ onClose }: { onClose: () => void }) {
             <span>로봇 수</span>
             <span style={{ color: '#58a6ff', fontWeight: 700 }}>{agentCount}대</span>
           </div>
-          <input type="range" min={1} max={8} step={1} value={agentCount}
+          <input type="range" min={1} max={100} step={1} value={agentCount}
             onChange={e => setAgentCount(parseInt(e.target.value))}
-            disabled={running}
             style={{ width: '100%', accentColor: '#58a6ff' }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#444c56', marginTop: 2 }}>
-            <span>1대</span><span>8대</span>
+            <span>1대</span><span>100대</span>
           </div>
         </div>
 
@@ -219,7 +233,7 @@ export function SimPanel({ onClose }: { onClose: () => void }) {
 function AgentList() {
   const { agents } = useSimRunStore();
   const STATE_COLOR: Record<string, string> = {
-    Idle: '#8b949e', Moving: '#58a6ff', Loading: '#d29922', Unloading: '#3fb950',
+    Idle: '#8b949e', Moving: '#58a6ff', Waiting: '#d29922', Processing: '#3fb950', Loading: '#d29922', Unloading: '#3fb950',
   };
 
   return (

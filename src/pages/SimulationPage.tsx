@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSimRunStore } from '../store/simRunStore';
 import { useEditorStore } from '../store/editorStore';
-import { ALGORITHM_META, type AlgorithmId } from '../core/pathfinding/algorithms';
+import { ALGORITHM_META, ALGORITHM_ORDER } from '../core/pathfinding/algorithms';
 import { SimMapCanvas } from '../components/simulation/SimMapCanvas';
 import { StallReportModal } from '../components/simulation/StallReportModal';
-
-const ALGO_IDS: AlgorithmId[] = ['standard', 'dijkstra', 'greedy', 'stochastic', 'priority', 'cbs'];
 const PROCESS_CYCLE = ['증착', '노광', '식각', '세정'];
 
 const STATE_COLOR: Record<string, string> = {
@@ -25,7 +23,7 @@ export function SimulationPage() {
     dismissStallReport,
   } = useSimRunStore();
 
-  const rafRef   = useRef<number>(0);
+  const rafRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastTRef = useRef<number | null>(null);
 
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
@@ -42,16 +40,16 @@ export function SimulationPage() {
 
   useEffect(() => {
     if (!running) { lastTRef.current = null; return; }
-    const loop = (time: number) => {
+    const INTERVAL_MS = 33; // ~30fps
+    rafRef.current = setInterval(() => {
+      const now = performance.now();
       const dt = lastTRef.current != null
-        ? Math.min((time - lastTRef.current) / 1000, 0.05)
+        ? Math.min((now - lastTRef.current) / 1000, 0.05)
         : 0;
-      lastTRef.current = time;
+      lastTRef.current = now;
       tick(dt);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
+    }, INTERVAL_MS);
+    return () => { if (rafRef.current != null) clearInterval(rafRef.current); };
   }, [running, tick]);
 
   useEffect(() => {
@@ -115,25 +113,27 @@ export function SimulationPage() {
 
         <div style={{ width: 1, height: 22, background: '#30363d', flexShrink: 0 }} />
 
-        {/* 알고리즘 선택 */}
+        {/* 알고리즘 선택 — 성능 순서 */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {ALGO_IDS.map(id => {
+          {ALGORITHM_ORDER.map(id => {
             const meta = ALGORITHM_META[id];
             const active = algorithmId === id;
+            const isCaution = meta.status === 'caution';
             return (
               <button
                 key={id}
                 onClick={() => setAlgorithm(id)}
+                title={meta.desc}
                 style={{
                   padding: '4px 9px', borderRadius: 6, fontSize: 11,
-                  border: `1px solid ${active ? meta.color : '#30363d'}`,
-                  background: active ? meta.color + '18' : '#21262d',
-                  color: active ? meta.color : '#8b949e',
+                  border: `1px solid ${active ? meta.color : isCaution ? '#f8514966' : '#30363d'}`,
+                  background: active ? meta.color + '18' : isCaution ? '#f8514911' : '#21262d',
+                  color: active ? meta.color : isCaution ? '#f85149aa' : '#8b949e',
                   cursor: 'pointer', fontWeight: active ? 700 : 400,
-                  transition: 'all 0.15s',
+                  transition: 'all 0.15s', opacity: isCaution ? 0.8 : 1,
                 }}
               >
-                {meta.label}
+                {meta.label}{isCaution ? ' ⚠' : ''}
               </button>
             );
           })}
@@ -144,10 +144,10 @@ export function SimulationPage() {
         {/* 최대 로봇 수 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
           <span style={{ fontSize: 11, color: '#8b949e' }}>최대 로봇</span>
-          <input type="range" min={1} max={12} step={1} value={agentCount}
+          <input type="range" min={1} max={100} step={1} value={agentCount}
             onChange={e => setAgentCount(parseInt(e.target.value))}
-            style={{ width: 70, accentColor: '#58a6ff' }} />
-          <span style={{ fontSize: 12, color: '#58a6ff', fontWeight: 700, minWidth: 32 }}>{agentCount}대</span>
+            style={{ width: 90, accentColor: '#58a6ff' }} />
+          <span style={{ fontSize: 12, color: '#58a6ff', fontWeight: 700, minWidth: 40 }}>{agentCount}대</span>
         </div>
 
         {/* 속도 */}

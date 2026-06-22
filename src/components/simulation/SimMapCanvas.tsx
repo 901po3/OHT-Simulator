@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { Stage, Layer, Circle, Arrow, Text, Group, Rect } from 'react-konva';
 import type Konva from 'konva';
 import { useEditorStore } from '../../store/editorStore';
@@ -10,6 +10,7 @@ const NODE_R = 24;
 const STATE_COLOR: Record<string, string> = {
   Idle:       '#8b949e',
   Moving:     '#58a6ff',
+  Waiting:    '#d29922',
   Processing: '#3fb950',
 };
 
@@ -22,6 +23,41 @@ export function SimMapCanvas({ width, height }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageScale, setStageScale] = useState(1);
+
+  // O(1) 노드 조회 — 대규모 맵(수백 노드)에서 find() 선형탐색 제거
+  const nodeById = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+
+  // 정적 레이어(레일+노드)는 맵 변경 시에만 재생성 → 매 tick 에이전트 갱신과 분리
+  const staticEls = useMemo(() => (
+    <>
+      {edges.map(edge => {
+        const from = nodeById.get(edge.fromId);
+        const to   = nodeById.get(edge.toId);
+        if (!from || !to) return null;
+        const dx = to.x - from.x; const dy = to.y - from.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = dx / len; const ny = dy / len;
+        return (
+          <Arrow
+            key={edge.id}
+            points={[from.x + nx * NODE_R, from.y + ny * NODE_R, to.x - nx * (NODE_R + 4), to.y - ny * (NODE_R + 4)]}
+            stroke="#58a6ff" strokeWidth={2} fill="#58a6ff"
+            pointerLength={8} pointerWidth={6} opacity={0.5} listening={false}
+          />
+        );
+      })}
+      {nodes.map(node => {
+        const meta = NODE_META[node.type];
+        return (
+          <Group key={node.id} x={node.x} y={node.y} listening={false}>
+            <Circle radius={NODE_R} fill={meta.color + '22'} stroke={meta.color} strokeWidth={2} />
+            <Text text={meta.icon} fontSize={18} fill={meta.color} offsetX={9} offsetY={10} listening={false} />
+            <Text text={meta.label} fontSize={10} fill="#8b949e" width={80} offsetX={40} offsetY={-NODE_R - 14} align="center" listening={false} />
+          </Group>
+        );
+      })}
+    </>
+  ), [edges, nodes, nodeById]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -115,35 +151,7 @@ export function SimMapCanvas({ width, height }: Props) {
         onDragEnd={onStageDragMove}
       >
         <Layer>
-          {/* 엣지 */}
-          {edges.map(edge => {
-            const from = nodes.find(n => n.id === edge.fromId);
-            const to   = nodes.find(n => n.id === edge.toId);
-            if (!from || !to) return null;
-            const dx = to.x - from.x; const dy = to.y - from.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            const nx = dx / len; const ny = dy / len;
-            return (
-              <Arrow
-                key={edge.id}
-                points={[from.x + nx * NODE_R, from.y + ny * NODE_R, to.x - nx * (NODE_R + 4), to.y - ny * (NODE_R + 4)]}
-                stroke="#58a6ff" strokeWidth={2} fill="#58a6ff"
-                pointerLength={8} pointerWidth={6} opacity={0.5}
-              />
-            );
-          })}
-
-          {/* 노드 */}
-          {nodes.map(node => {
-            const meta = NODE_META[node.type];
-            return (
-              <Group key={node.id} x={node.x} y={node.y} listening={false}>
-                <Circle radius={NODE_R} fill={meta.color + '22'} stroke={meta.color} strokeWidth={2} />
-                <Text text={meta.icon} fontSize={18} fill={meta.color} offsetX={9} offsetY={10} listening={false} />
-                <Text text={meta.label} fontSize={10} fill="#8b949e" width={80} offsetX={40} offsetY={-NODE_R - 14} align="center" listening={false} />
-              </Group>
-            );
-          })}
+          {staticEls}
         </Layer>
 
         {/* 시뮬레이션 오버레이 */}
@@ -152,7 +160,7 @@ export function SimMapCanvas({ width, height }: Props) {
             {/* 혼잡도 히트맵 */}
             {[...congestion.entries()].map(([nodeId, cong]) => {
               if (cong < 0.1) return null;
-              const nd = nodes.find(n => n.id === nodeId);
+              const nd = nodeById.get(nodeId);
               if (!nd) return null;
               return (
                 <Circle key={`cong-${nodeId}`} x={nd.x} y={nd.y}
@@ -160,9 +168,9 @@ export function SimMapCanvas({ width, height }: Props) {
               );
             })}
 
-            {/* 경로 미리보기 */}
-            {agents.map(agent => {
-              if (agent.state !== 'Moving' || agent.path.length < 2) return null;
+            {/* 경로 미리보기 — 로봇이 많으면 화면이 복잡하고 느려지므로 24대 이하에서만 */}
+            {agents.length <= 24 && agents.map(agent => {
+              if ((agent.state !== 'Moving' && agent.state !== 'Waiting') || agent.path.length < 2) return null;
               const remaining = agent.path.slice(agent.pathIndex);
               if (remaining.length < 2) return null;
               const points: number[] = [];

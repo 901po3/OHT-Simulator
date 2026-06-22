@@ -121,35 +121,91 @@ function buildGrid(
   return { nodes: grid.flat(), edges };
 }
 
-// 프리셋 2: 중형 — 4×5 그리드 (20노드, 공정 2×4)
-// ⚠ 구 버전: (0,0) 코너 증착 + (0,2) 엣지 노광 → 상단 행 단일 경로 병목
-// 개선: 공정 노드를 코너 회피 위치로 이동, 각 연속 공정 쌍 사이 경로 2개 이상 보장
-//   (0,1)Dep ↔ (0,3)Exp: 상단 행 경로 + row1 우회 경로
-//   (3,3)Dep ↔ (3,1)Exp: 행 내 직선 + row4 우회 경로
+// 프리셋 2: 중형 — 4×5 그리드 (20노드, 공정 종류별 2개, Depot 2)
+// 설계 원칙: 특수 노드 비인접 (체커보드 배치 — (row+col)%2===0 셀만 사용)
+// 2개 루트: 좌측(col 0-1) / 우측(col 2-3) 각각 D·E·Et·C 1개씩
 function buildMediumMap(): MapData {
   return buildGrid(4, 5, 100, 185, 75, 125, {
-    '0,1': 'Deposition', '0,3': 'Exposure',
-    '2,0': 'Cleaning',   '2,2': 'Depot',   '2,3': 'Etching',
-    '3,1': 'Exposure',   '3,3': 'Deposition',
-    '4,1': 'Etching',    '4,2': 'Cleaning',
+    '0,0': 'Deposition', '0,2': 'Exposure',
+    '1,1': 'Etching',    '1,3': 'Cleaning',
+    '2,0': 'Exposure',   '2,2': 'Depot',
+    '3,1': 'Etching',    '3,3': 'Deposition',
+    '4,0': 'Depot',      '4,2': 'Cleaning',
   });
 }
 
-// 프리셋 3: 대형 — 5×6 그리드 (30노드, 공정 3×4, Depot 2)
-// ⚠ 구 버전: (0,0) 코너 증착 + (0,2) 엣지 노광 → 단일 경로 막힘 보고됨
-// 개선: 코너 노드 제거, 공정 노드 내부/엣지(비코너) 분산
-//   (0,1)Dep ↔ (0,3)Exp: 상단 행 + row1 우회 — 최소 2개 경로
-//   (3,3)Dep ↔ (3,1)Exp: 행 내 직선 + row4 우회 — 최소 2개 경로
-// Depot 2개: (2,2) 중앙 / (4,4) 우측 → 스폰 부하 분산
+// 프리셋 3: 대형 — 5×6 그리드 (30노드, 공정 종류별 3개, Depot 2)
+// 설계 원칙: 특수 노드 비인접 (체커보드 배치 — (row+col)%2===0 셀만 사용)
+// 3개 루트: 좌(col 0) / 중(col 2) / 우(col 4) 각 루트에 D·E·Et·C 분산 배치
+// D×3: (0,0)(0,4)(3,3) / E×3: (0,2)(1,3)(5,1) / Et×3: (1,1)(3,1)(5,3) / C×3: (2,0)(2,4)(4,0)
 function buildLargeMap(): MapData {
   return buildGrid(5, 6, 80, 145, 65, 110, {
-    '0,1': 'Deposition', '0,3': 'Exposure',
-    '1,4': 'Etching',
-    '2,0': 'Cleaning',   '2,2': 'Depot',
-    '3,1': 'Exposure',   '3,3': 'Deposition',
-    '4,0': 'Etching',    '4,2': 'Cleaning',   '4,4': 'Depot',
-    '5,1': 'Deposition', '5,2': 'Exposure',   '5,3': 'Etching', '5,4': 'Cleaning',
+    '0,0': 'Deposition', '0,2': 'Exposure',   '0,4': 'Deposition',
+    '1,1': 'Etching',    '1,3': 'Exposure',
+    '2,0': 'Cleaning',   '2,2': 'Depot',      '2,4': 'Cleaning',
+    '3,1': 'Etching',    '3,3': 'Deposition',
+    '4,0': 'Cleaning',   '4,4': 'Depot',
+    '5,1': 'Exposure',   '5,3': 'Etching',
   });
+}
+
+// 프리셋 4: 초대형 팹 (∞ 무한 운전) — 단방향(one-way) 방향성 그리드
+// ───────────────────────────────────────────────────────────────────
+// 실제 반도체 FAB의 OHT 트랙처럼 모든 레일이 단방향이다.
+//   · 가로 레일: 짝수 행 → 오른쪽, 홀수 행 → 왼쪽
+//   · 세로 레일: 짝수 열 → 아래, 홀수 열 → 위
+// 이 교차 단방향 구조는 (1) 그래프가 강결합(모든 노드 상호 도달)이면서
+// (2) 같은 엣지의 역방향이 존재하지 않아 정면충돌·교착(2-cycle)이 구조적으로 불가능하다.
+// 3대 이상이 루프를 이루는 교착은 시뮬레이터의 '동시 회전(rotation)' 해소로 처리된다.
+//
+// 공정 스테이션은 (짝수행,짝수열) 부분격자에 D·E·Et·C 순환 배치 → 항상 비인접,
+// 균등 분산되어 다음 공정이 늘 가까이 있어 동선이 짧다. 차고지는 외곽에 분산.
+function buildFabMap(): MapData {
+  const cols = 20, rows = 16;
+  const x0 = 60, dx = 70, y0 = 60, dy = 70;
+  let nSeq = 1, eSeq = 1;
+  type GN = { id: string; type: NT; x: number; y: number };
+
+  const PROC: NT[] = ['Deposition', 'Exposure', 'Etching', 'Cleaning'];
+  // 외곽에 분산 배치할 차고지 좌표 (짝수,짝수 부분격자 셀)
+  const depotCells = new Set([
+    '0,0', `0,${cols - 2}`, `${rows - 2},0`, `${rows - 2},${cols - 2}`,
+    `0,${Math.floor(cols / 2)}`, `${rows - 2},${Math.floor(cols / 2)}`,
+    `${Math.floor(rows / 2)},0`, `${Math.floor(rows / 2)},${cols - 2}`,
+  ]);
+
+  let stIdx = 0;
+  const grid: GN[][] = [];
+  for (let r = 0; r < rows; r++) {
+    const row: GN[] = [];
+    for (let c = 0; c < cols; c++) {
+      let type: NT = 'Normal';
+      if (r % 2 === 0 && c % 2 === 0) {
+        type = depotCells.has(`${r},${c}`) ? 'Depot' : PROC[stIdx++ % 4];
+      }
+      row.push({ id: `node-${nSeq++}`, type, x: x0 + c * dx, y: y0 + r * dy });
+    }
+    grid.push(row);
+  }
+
+  const edges: { id: string; fromId: string; toId: string }[] = [];
+  const dir = (a: GN, b: GN) => edges.push({ id: `edge-${eSeq++}`, fromId: a.id, toId: b.id });
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // 가로: 짝수 행 → 오른쪽, 홀수 행 → 왼쪽 (단방향)
+      if (c + 1 < cols) {
+        if (r % 2 === 0) dir(grid[r][c], grid[r][c + 1]);
+        else             dir(grid[r][c + 1], grid[r][c]);
+      }
+      // 세로: 짝수 열 → 아래, 홀수 열 → 위 (단방향)
+      if (r + 1 < rows) {
+        if (c % 2 === 0) dir(grid[r][c], grid[r + 1][c]);
+        else             dir(grid[r + 1][c], grid[r][c]);
+      }
+    }
+  }
+
+  return { nodes: grid.flat(), edges };
 }
 
 export function NodePalette() {
@@ -346,6 +402,7 @@ export function NodePalette() {
               { label: '소형', sub: '공정 1×4 · 13노드', fn: buildSmallMap,  color: '#58a6ff' },
               { label: '중형', sub: '공정 2×4 · 20노드', fn: buildMediumMap, color: '#ffa657' },
               { label: '대형', sub: '공정 3×4 · 30노드', fn: buildLargeMap,  color: '#bc8cff' },
+              { label: '초대형 팹 ∞', sub: '단방향 · 320노드 · 100대 무한운전', fn: buildFabMap, color: '#39d353' },
             ] as const).map(({ label, sub, fn, color }) => (
               <button
                 key={label}
