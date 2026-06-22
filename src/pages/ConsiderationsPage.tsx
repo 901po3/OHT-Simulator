@@ -23,13 +23,13 @@ export function ConsiderationsPage() {
 
         {/* § 서론 */}
         <section>
-          <SectionTitle>§ 0. 이 시뮬레이터는 왜 불완전한가</SectionTitle>
+          <SectionTitle>§ 0. 설계 경계: 이 프로토타입의 축약과 확장 방향</SectionTitle>
           <Card>
             <p style={{ fontSize: 14, color: '#8b949e', lineHeight: 1.85, margin: 0 }}>
-              현재 OHT-System 시뮬레이터는 <strong style={{ color: '#e6edf3' }}>순수 경로탐색과 교착 회피</strong>에 초점을 맞추고 있습니다.
-              실제 반도체 FAB의 Overhead Hoist Transport 시스템은 훨씬 더 복잡한 제약과 동역학을 가지고 있습니다.
-              아래는 현재 모델에서 <strong style={{ color: '#3fb950' }}>단순화되거나 제외된 변수들</strong>과
-              이들이 시스템에 어떤 영향을 미치는지 정리한 내용입니다.
+              OHT-System 시뮬레이터는 <strong style={{ color: '#e6edf3' }}>경로탐색 알고리즘과 교착 회피 메커니즘의 핵심 로직을 검증</strong>하기 위한 프로토타입입니다.
+              실제 반도체 FAB의 Overhead Hoist Transport 시스템은 물리적 제약, 동적 스케줄링, 자원 관리, 통신 지연 등 훨씬 광범위한 변수를 포함합니다.
+              아래는 현재 모델에서 <strong style={{ color: '#3fb950' }}>의도적으로 축약 또는 제외된 변수들</strong>과
+              각 변수가 실제 시스템의 성능에 미치는 영향을 정리한 것입니다. 이를 통해 후속 연구와 확장의 방향을 제시합니다.
             </p>
           </Card>
         </section>

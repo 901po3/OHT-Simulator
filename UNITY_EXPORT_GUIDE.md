@@ -1,8 +1,21 @@
-# OHT-System → Unity 3D 시뮬레이션 가이드
+# OHT-System → Unity 3D 시뮬레이션: XML 직렬화 및 통합 가이드
 
 ## 🎯 개요
 
-OHT-System 웹 시뮬레이터에서 최적화된 맵 데이터와 효율 정보를 **XML**로 내보내어, Unity에서 3D 시뮬레이션으로 구축할 수 있습니다.
+OHT-System 웹 시뮬레이터에서 경로탐색 알고리즘 검증을 완료한 최적화된 **맵 토폴로지**, **효율 메트릭**, **최적화 힌트**를 **XmlSerializer 호환 XML 형식**으로 내보내어, Unity 3D 환경에서 실시간 시각화 및 3D 시뮬레이션을 구축할 수 있습니다.
+
+### 데이터 흐름
+```
+웹 시뮬레이션 (경로탐색 + 교착 회피 검증)
+    ↓
+효율 메트릭 누적 (처리율, 혼잡도, 최적 로봇 수 계산)
+    ↓
+XML 내보내기 (MapMetadata + Nodes + Edges + ProcessStations + Depots + OptimizationHints)
+    ↓
+Unity C# 역직렬화 (OHTSimulationData.cs + OHTSimulationLoader)
+    ↓
+3D 씬 구축 (노드 렌더링, 레일 시각화, 로봇 에이전트 생성)
+```
 
 ---
 

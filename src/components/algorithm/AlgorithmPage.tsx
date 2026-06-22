@@ -708,11 +708,11 @@ export function AlgorithmPage() {
 
       {/* § 개요 */}
       <section>
-        <SectionTitle>§ 1. 프로젝트 목표와 알고리즘 선택 기준</SectionTitle>
+        <SectionTitle>§ 1. 다중 에이전트 경로탐색의 근본 과제 및 설계 기준</SectionTitle>
         <Card>
           <p style={{ fontSize: 14, color: '#8b949e', lineHeight: 1.85, marginBottom: 16 }}>
-            반도체 팹의 천장 레일에서 다수의 OHT(Overhead Hoist Transport) 로봇이 웨이퍼를 운반합니다.
-            이 환경에서 알고리즘은 동시에 세 가지 조건을 만족해야 했습니다.
+            현대 반도체 FAB의 Overhead Hoist Transport(OHT) 시스템에서는 수십~수백 대의 로봇이 천장 레일을 통해 동시에 웨이퍼를 운반합니다.
+            이러한 <strong style={{ color: '#e6edf3' }}>다중 에이전트 환경</strong>에서 경로탐색 알고리즘이 충족해야 할 설계 기준은 상충적입니다:
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {[
