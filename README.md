@@ -1,8 +1,11 @@
 # OHT-Simulator
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel)](https://oht-simulator-by-hyukin.vercel.app)
 [![GitHub](https://img.shields.io/badge/GitHub-View%20Repo-blue?logo=github)](https://github.com/901po3/OHT-Simulator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen)](#)
+
+🌐 **라이브 데모**: <https://oht-simulator-by-hyukin.vercel.app>
 
 **100대 로봇 무한 운행 OHT 시뮬레이터**
 
