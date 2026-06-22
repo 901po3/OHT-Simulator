@@ -25,9 +25,11 @@ namespace OHTSim.Core
             MapNode from,
             MapNode to,
             OHTMapData map,
-            Dictionary<string, float> congestion = null,    // Priority A*용
-            Dictionary<string, int> reservations = null,    // CBS-Lite용
-            float noiseLevel = 0.3f)                        // Stochastic A*용
+            Dictionary<string, float> congestion = null,                      // Priority A*용
+            Dictionary<string, int> reservations = null,                      // CBS-Lite용 (레거시)
+            Dictionary<(string, int), bool> spaceTimeReservations = null,     // CBS-Lite용 (타임스텝)
+            int currentTimestep = 0,                                          // 현재 시간 (프레임)
+            float noiseLevel = 0.3f)                                          // Stochastic A*용
         {
             return algorithmId switch
             {
@@ -36,7 +38,9 @@ namespace OHTSim.Core
                 AlgorithmId.Greedy     => GreedyBFS(from, to),
                 AlgorithmId.Stochastic => StochasticAStar(from, to, noiseLevel),
                 AlgorithmId.Priority   => PriorityAStar(from, to, congestion ?? new Dictionary<string, float>()),
-                AlgorithmId.CbsLite    => CbsLite(from, to, reservations ?? new Dictionary<string, int>()),
+                AlgorithmId.CbsLite    => CbsLiteSpaceTime(from, to,
+                    spaceTimeReservations ?? new Dictionary<(string, int), bool>(),
+                    currentTimestep),
                 _                      => StandardAStar(from, to),
             };
         }
@@ -178,8 +182,54 @@ namespace OHTSim.Core
             return new List<MapNode>();
         }
 
-        // ── 6. CBS-Lite (예약 테이블 페널티) ────────────────────────
-        // 웹: reservations.has(nodeId) → cost ×8
+        // ── 6. CBS-Lite (시공간 예약 테이블) ────────────────────────
+        // 8스텝 루킹 어헤드: 현재~미래 8프레임 간 (node, timestep) 충돌 감지
+        // (node_id, timestep) → reserved 형태의 예약 테이블 기반
+        public static List<MapNode> CbsLiteSpaceTime(
+            MapNode from, MapNode to, Dictionary<(string, int), bool> spaceTimeReservations,
+            int currentTimestep = 0,
+            int CBS_LOOKAHEAD = 8)
+        {
+            var open  = new HashSet<MapNode> { from };
+            var came  = new Dictionary<MapNode, MapNode>();
+            var g     = new Dictionary<MapNode, float> { [from] = 0f };
+            var f     = new Dictionary<MapNode, float> { [from] = Heuristic(from, to) };
+            var depth = new Dictionary<MapNode, int> { [from] = 0 };  // 출발점까지 거리(프레임 수)
+
+            while (open.Count > 0)
+            {
+                var cur = MinF(open, f);
+                if (cur == to) return Reconstruct(came, cur);
+                open.Remove(cur);
+
+                int curDepth = Get(depth, cur);
+                foreach (var e in cur.edges)
+                {
+                    int nextDepth = curDepth + 1;  // 다음 노드 도달까지의 프레임 수
+                    int futureTimestep = currentTimestep + nextDepth;  // 실제 도달 시간
+
+                    // 8스텝 루킹 어헤드: (e.to, futureTimestep)이 예약되어 있는가?
+                    bool isReserved = nextDepth < CBS_LOOKAHEAD &&
+                                      spaceTimeReservations.ContainsKey((e.to.id, futureTimestep));
+
+                    float penalty = isReserved ? 8f : 1f;  // 충돌 회피를 위한 강력한 페널티
+                    float tg      = Get(g, cur) + e.weight * penalty;
+
+                    if (tg < Get(g, e.to))
+                    {
+                        came[e.to] = cur;
+                        g[e.to]    = tg;
+                        depth[e.to] = nextDepth;
+                        f[e.to]    = tg + Heuristic(e.to, to);
+                        open.Add(e.to);
+                    }
+                }
+            }
+            return new List<MapNode>();
+        }
+
+        // 레거시 호환성 (단순 노드 점유 기반, 타임스텝 미지원)
+        [Obsolete("Use CbsLiteSpaceTime instead")]
         public static List<MapNode> CbsLite(
             MapNode from, MapNode to, Dictionary<string, int> reservations)
         {
