@@ -68,6 +68,16 @@ export interface SimAgent {
 // ── 처리량 메트릭 ──────────────────────────────────────
 export interface ThroughputSample { t: number; perRobot: number; total: number }
 export interface AgentRateSample { t: number; rate: number }
+export interface EfficiencySnapshot {
+  procUtil: number;       // 공정 노드 가동률 (0~1)
+  robotUtil: number;      // 로봇 유효 활동률 (Moving+Processing / 전체)
+  avgWaitSec: number;     // 평균 대기 시간
+  idleRatio: number;      // Idle 비율
+  waitRatio: number;      // Waiting 비율
+  movingRatio: number;    // Moving 비율
+  procRatio: number;      // Processing 비율
+  optimalHint: string;    // 최적 투입 판정 문구
+}
 const SAMPLE_SEC        = 1.5; // 처리량 샘플링 주기 (초)
 const MAX_SAMPLES       = 80;  // 전체 시계열 길이
 const MAX_AGENT_SAMPLES = 40;  // 로봇별 시계열 길이
@@ -302,6 +312,7 @@ interface SimRunState {
   selectedAgentId: string | null;            // 클릭 선택된 로봇 (null = 전체 평균)
   throughputHistory: ThroughputSample[];      // 전체 처리량 시계열
   agentRateHistory: Map<string, AgentRateSample[]>; // 로봇별 처리량 시계열
+  efficiency: EfficiencySnapshot | null;
   _sampleAccum: number;
   _lastSampleElapsed: number;
   _lastTotalJobs: number;
@@ -338,6 +349,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
   selectedAgentId: null,
   throughputHistory: [],
   agentRateHistory: new Map(),
+  efficiency: null,
   _sampleAccum: 0,
   _lastSampleElapsed: 0,
   _lastTotalJobs: 0,
@@ -375,7 +387,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       congestion: new Map(), stallReport: null, stallSinceSec: 0,
       overcrowdWarning: null,
       stats: { completedJobs: 0, totalDistance: 0, elapsedSec: 0, distPerSec: 0 },
-      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(),
+      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(), efficiency: null,
       _sampleAccum: 0, _lastSampleElapsed: 0, _lastTotalJobs: 0, _lastAgentJobs: new Map(),
     });
   },
@@ -384,7 +396,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
     set({
       running: false, agents: [], spawnTimers: new Map(),
       agentSeq: 1, stallReport: null, stallSinceSec: 0, overcrowdWarning: null,
-      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(),
+      selectedAgentId: null, throughputHistory: [], agentRateHistory: new Map(), efficiency: null,
       _sampleAccum: 0, _lastSampleElapsed: 0, _lastTotalJobs: 0, _lastAgentJobs: new Map(),
     });
   },
@@ -758,6 +770,50 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       sAccum = 0;
     }
 
+    // ── 효율 스냅샷 (매 tick 갱신) ──────────────────────────────────────
+    let newEfficiency: EfficiencySnapshot | null = null;
+    if (activeAgents.length > 0) {
+      const movC = activeAgents.filter(a => a.state === 'Moving').length;
+      const proC = activeAgents.filter(a => a.state === 'Processing').length;
+      const waiC = activeAgents.filter(a => a.state === 'Waiting').length;
+      const idlC = activeAgents.filter(a => a.state === 'Idle').length;
+      const tot  = activeAgents.length;
+      const movingRatio = movC / tot;
+      const procRatio   = proC / tot;
+      const waitRatio   = waiC / tot;
+      const idleRatio   = idlC / tot;
+      const robotUtil   = (movC + proC) / tot;
+      const procUtil    = processNodeCount > 0 ? proC / processNodeCount : 0;
+      const avgWaitSec  = tot > 0
+        ? activeAgents.reduce((s, a) => s + a.blockedSec, 0) / tot
+        : 0;
+
+      const ratio = processNodeCount > 0 ? tot / processNodeCount : 0;
+      let optimalHint: string;
+      if (processNodeCount === 0) {
+        optimalHint = '공정 노드 없음 — 맵에 공정 스테이션을 추가하세요';
+      } else if (ratio < 1) {
+        optimalHint = `과소 투입 — 공정 노드(${processNodeCount}개)보다 로봇이 적어 가동률이 낮습니다. ${Math.ceil(processNodeCount * 1.2)}~${Math.ceil(processNodeCount * 1.5)}대 권장`;
+      } else if (ratio <= 1.5) {
+        optimalHint = `최적 범위 — 로봇 ${tot}대 / 공정 ${processNodeCount}개 = ${ratio.toFixed(1)}× (권장 1~1.5×)`;
+      } else if (ratio <= 2) {
+        optimalHint = `허용 범위 — ${ratio.toFixed(1)}× (권장 초과). 대기 비율 ${Math.round(waitRatio * 100)}%가 높다면 줄이세요`;
+      } else {
+        optimalHint = `과잉 투입 — ${ratio.toFixed(1)}× (상한 2× 초과). 로봇을 ${Math.ceil(processNodeCount * 1.5)}대 이하로 줄이세요`;
+      }
+
+      newEfficiency = {
+        procUtil: parseFloat(procUtil.toFixed(3)),
+        robotUtil: parseFloat(robotUtil.toFixed(3)),
+        avgWaitSec: parseFloat(avgWaitSec.toFixed(2)),
+        idleRatio: parseFloat(idleRatio.toFixed(3)),
+        waitRatio: parseFloat(waitRatio.toFixed(3)),
+        movingRatio: parseFloat(movingRatio.toFixed(3)),
+        procRatio: parseFloat(procRatio.toFixed(3)),
+        optimalHint,
+      };
+    }
+
     set({
       agents: finalAgents,
       agentSeq: nextSeq,
@@ -768,6 +824,7 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
       overcrowdWarning: newOvercrowd,
       throughputHistory: newThroughput,
       agentRateHistory: newAgentRate,
+      efficiency: newEfficiency,
       _sampleAccum: sAccum,
       _lastSampleElapsed: lastSampleElapsed,
       _lastTotalJobs: lastTotalJobs,
