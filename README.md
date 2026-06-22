@@ -107,7 +107,7 @@ src/
 
 ```bash
 npm install
-npm run dev      # localhost:5173
+npm run dev      # Local dev server (check terminal for actual URL, typically http://localhost:PORT)
 npm run build    # dist/ 빌드
 ```
 

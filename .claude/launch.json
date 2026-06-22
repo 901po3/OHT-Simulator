@@ -5,7 +5,8 @@
       "name": "oht-system",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 5173
+      "port": 59300,
+      "comment": "Note: Actual port is dynamically assigned by Vite dev server. Check terminal output for actual URL."
     }
   ]
 }

@@ -313,7 +313,7 @@ Standard A*는 빠르지만 불안정 ↔ CBS-Lite는 안정하지만 느림
 
 **포트폴리오 링크**:
 - 🔗 GitHub: https://github.com/901po3/OHT-Simulator
-- 🌐 라이브 데모: (Vercel 배포 대기 중)
+- 🌐 라이브 데모: https://oht-simulator.vercel.app
 
 ---
 
