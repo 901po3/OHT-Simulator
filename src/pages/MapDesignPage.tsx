@@ -118,10 +118,10 @@ const PRINCIPLES = [
 ];
 
 const PRESETS = [
-  { name: '소형', nodes: '13', conn: '양방향', proc: '종류별 1개', use: '알고리즘 기본 동작 확인', color: '#58a6ff' },
-  { name: '중형', nodes: '20', conn: '양방향', proc: '종류별 2개', use: '2개 루트 분산 테스트', color: '#ffa657' },
-  { name: '대형', nodes: '30', conn: '양방향', proc: '종류별 3개', use: '3개 루트 분산 테스트', color: '#bc8cff' },
-  { name: '초대형 팹 ∞', nodes: '320', conn: '단방향', proc: '종류별 ~20개', use: '100대 무한 운전 (교착-free)', color: '#39d353' },
+  { name: '소형',         nodes: '24',  conn: '단방향', proc: '종류별 1개',    use: '알고리즘 기본 동작 확인',        color: '#58a6ff' },
+  { name: '중형',         nodes: '48',  conn: '단방향', proc: '종류별 2개',    use: '2개 루트 분산 테스트',           color: '#ffa657' },
+  { name: '대형',         nodes: '96',  conn: '단방향', proc: '종류별 4~5개',  use: '중규모 라인 부하 테스트',        color: '#bc8cff' },
+  { name: '초대형 팹 ∞',  nodes: '320', conn: '단방향', proc: '종류별 ~18개', use: '100대 무한 운전 (교착-free)',     color: '#39d353' },
 ];
 
 const ANTIPATTERNS = [
@@ -243,9 +243,9 @@ export function MapDesignPage() {
             {/* 프리셋별 권장 대수 */}
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {[
-                { name: '소형', proc: 4, rec: '4~6대', color: '#58a6ff' },
-                { name: '중형', proc: 8, rec: '8~12대', color: '#ffa657' },
-                { name: '대형', proc: 12, rec: '12~18대', color: '#bc8cff' },
+                { name: '소형',      proc: 4,  rec: '4~6대',    color: '#58a6ff' },
+                { name: '중형',      proc: 8,  rec: '8~12대',   color: '#ffa657' },
+                { name: '대형',      proc: 18, rec: '18~27대',  color: '#bc8cff' },
                 { name: '초대형 팹', proc: 72, rec: '70~100대', color: '#39d353' },
               ].map(p => (
                 <div key={p.name} style={{ background: '#21262d', borderRadius: 8, padding: '12px 10px', textAlign: 'center' }}>
@@ -283,8 +283,8 @@ export function MapDesignPage() {
             </div>
           </Card>
           <p style={{ fontSize: 12, color: '#444c56', lineHeight: 1.7, marginTop: 12 }}>
-            소·중·대형은 알고리즘 비교용 양방향 맵이며, <strong style={{ color: '#8b949e' }}>초대형 팹 ∞</strong>만 단방향 구조로
-            100대 무한 운전을 보장합니다. 에디터의 "자동 생성 ▼"에서 불러올 수 있습니다.
+            네 프리셋 모두 § 2의 <strong style={{ color: '#8b949e' }}>네 가지 설계 원칙(단방향 강결합 · 비인접 · 균등 분산 · 외곽 차고지)</strong>을 동일하게 따릅니다.
+            크기만 다를 뿐 토폴로지 구조가 일관되어, 알고리즘 비교가 공정한 조건에서 이뤄집니다. 에디터의 "자동 생성 ▼"에서 불러올 수 있습니다.
           </p>
         </section>
 
