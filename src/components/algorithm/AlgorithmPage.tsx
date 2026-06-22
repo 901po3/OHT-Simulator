@@ -760,6 +760,26 @@ export function AlgorithmPage() {
         </Card>
       </section>
 
+      {/* § 의외의 발견 — 시스템이 알고리즘을 압도한다 */}
+      <section>
+        <SectionTitle>💡 의외의 발견 — 시스템이 알고리즘을 압도한다</SectionTitle>
+        <Card>
+          <p style={{ fontSize: 13, color: '#e6edf3', lineHeight: 1.8, marginBottom: 14 }}>
+            7종 알고리즘을 단계별로 비교했지만, <strong style={{ color: '#f0b72f' }}>자동 디스패칭</strong>(가장 가까운 가용 로봇 ↔ 가장 가까운 작업 자동 배정 + 모든 로봇이 <code style={{ color: '#79c0ff' }}>plannedCong</code> 계획 혼잡도 맵 공유)을 적용한 순간,
+            알고리즘별 처리량·혼잡도 차이가 <strong style={{ color: '#f0b72f' }}>노이즈 수준</strong>으로 줄어들었습니다.
+          </p>
+          <ul style={{ fontSize: 12, color: '#8b949e', lineHeight: 1.9, paddingLeft: 18, marginBottom: 14 }}>
+            <li>목표 자동 분산 + <code style={{ color: '#79c0ff' }}>plannedCong</code> 공유로 모든 알고리즘이 동일한 비용 신호를 받아, 휴리스틱 차이가 평탄화됩니다.</li>
+            <li>분산 시스템·DB 쿼리 옵티마이저·캐싱 계층에서 반복되는 메타 패턴 — 컴포넌트 최적화는 <strong style={{ color: '#e6edf3' }}>시스템 설계가 결정한 상한</strong> 안에서만 의미가 있습니다.</li>
+            <li><strong style={{ color: '#f85149' }}>한계</strong>: 자동 디스패칭 ON, 100대 / 12×8 맵 조건의 관찰입니다. 디스패칭 OFF나 극단적 혼잡(200대+, 좁은 통로)에서는 차이가 다시 드러날 가능성이 있어 추가 벤치마크가 필요합니다.</li>
+          </ul>
+          <blockquote style={{ borderLeft: '3px solid #f0b72f', paddingLeft: 14, margin: 0, fontSize: 13, color: '#e6edf3', lineHeight: 1.8 }}>
+            <strong style={{ color: '#f0b72f' }}>결론</strong> — 본 프로젝트의 진짜 기여는 "최적 알고리즘 선택"이 아니라
+            <strong style={{ color: '#3fb950' }}> 경로탐색 + 디스패칭 + 데드락 에스컬레이션을 결합한 시스템 설계</strong>입니다.
+          </blockquote>
+        </Card>
+      </section>
+
       {/* § CBS 심화 */}
       <section>
         <SectionTitle>§ 4. CBS — 이론 최적과 실시간의 충돌</SectionTitle>
