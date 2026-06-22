@@ -116,7 +116,7 @@ export function MobileLayout({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
             <a
-              href="https://youtu.be/0Y_7qUAT7oc"
+              href="https://www.youtube.com/watch?v=MgcAas0tiJc"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}

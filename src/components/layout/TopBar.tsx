@@ -104,7 +104,7 @@ export function TopBar() {
 
         {/* 데모 영상 — 항상 표시 */}
         <a
-          href="https://youtu.be/0Y_7qUAT7oc"
+          href="https://www.youtube.com/watch?v=MgcAas0tiJc"
           target="_blank"
           rel="noopener noreferrer"
           title="데모 영상 (맵 에디팅 → 시뮬레이션 → XML 추출 → Unity 실행)"
