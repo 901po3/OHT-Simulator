@@ -1,7 +1,19 @@
-# OHT System — 포트폴리오 웹 애플리케이션
+# OHT-Simulator
+
+[![GitHub](https://img.shields.io/badge/GitHub-View%20Repo-blue?logo=github)](https://github.com/901po3/OHT-Simulator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen)](#)
+
+**100대 로봇 무한 운행 OHT 시뮬레이터**
 
 반도체 팹 OHT(Overhead Hoist Transport) 시뮬레이터 포트폴리오.  
 Unity 3D 시뮬레이터 개발 과정에서 시도한 알고리즘, 설계 결정, 최적화 이력을 인터랙티브하게 보여주는 웹 앱.
+
+**핵심 기술**
+- 🎯 **Priority A* + CBS-Lite 하이브리드** 경로탐색 (교착률 0%)
+- 🔗 **단방향 그리드** 설계 (정면충돌 구조적 불가능)
+- ⚡ **100대 로봇** 동시 운행 시뮬레이션
+- 🎨 **웹 + 3D 통합** (React+TS + Unity)
 
 ## 기술 스택
 
