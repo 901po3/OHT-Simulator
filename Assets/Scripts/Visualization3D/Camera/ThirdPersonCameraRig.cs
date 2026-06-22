@@ -54,7 +54,8 @@ namespace OHTSim.Visualization3D
         void HandleCameraModeChanged(SimEvents.CameraMode mode)
         {
             _enabled = (mode == SimEvents.CameraMode.ThirdPerson);
-            _cam.enabled = _enabled;
+            // 풀스크린 탑뷰일 때만 카메라 자체를 비활성화합니다. 카메라맨 모드일 때는 카메라 컴포넌트가 활성화 상태로 탐색해야 합니다.
+            _cam.enabled = (mode != SimEvents.CameraMode.FullscreenTopView);
         }
 
         void HandleMapBuilt(int _, int __) => CenterOnMap();

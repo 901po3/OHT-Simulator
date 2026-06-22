@@ -11,6 +11,7 @@ namespace OHTSim.Visualization3D
     {
         public Camera Cam { get; private set; }
         VisualizationConfig _config;
+        CameraModeController _modeController;
 
         // 풀스크린 토뷰 모드용 카메라 컨트롤 상태
         Vector3 _topViewCenter;
@@ -29,6 +30,7 @@ namespace OHTSim.Visualization3D
         void Start()
         {
             _config = GameServices.Config;
+            _modeController = Object.FindAnyObjectByType<CameraModeController>();
         }
 
         void OnEnable()
@@ -107,11 +109,44 @@ namespace OHTSim.Visualization3D
             ApplyTransform();
         }
 
+        private float _lastYaw = 0f;
+
         void ApplyTransform()
         {
             // 맵 위쪽에서 내려다본다
             transform.position = new Vector3(_topViewCenter.x, 50f, _topViewCenter.z);
+
+            var mode = _modeController != null ? _modeController.CurrentMode : SimEvents.CameraMode.ThirdPerson;
+            if (mode == SimEvents.CameraMode.FullscreenTopView)
+            {
+                // 탑뷰에서는 정방향 탑다운 고정
+                transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            }
+            else
+            {
+                // 미니맵 모드일 때는 메인 카메라 Yaw에 맞춰 카메라 회전 (메인 3D 시야 정렬!)
+                var mainCam = Camera.main;
+                float yaw = mainCam != null ? mainCam.transform.eulerAngles.y : 0f;
+                transform.rotation = Quaternion.Euler(90f, yaw, 0f);
+            }
+
             Cam.orthographicSize = _topViewOrtho;
+        }
+
+        private void Update()
+        {
+            var mode = _modeController != null ? _modeController.CurrentMode : SimEvents.CameraMode.ThirdPerson;
+            if (mode != SimEvents.CameraMode.FullscreenTopView)
+            {
+                // 메인 카메라 각도가 계속 변하므로 미니맵 모드에서는 매 프레임 위치/각도 업데이트 반영
+                var mainCam = Camera.main;
+                float yaw = mainCam != null ? mainCam.transform.eulerAngles.y : 0f;
+                if (!Mathf.Approximately(yaw, _lastYaw))
+                {
+                    _lastYaw = yaw;
+                    ApplyTransform();
+                }
+            }
         }
     }
 }

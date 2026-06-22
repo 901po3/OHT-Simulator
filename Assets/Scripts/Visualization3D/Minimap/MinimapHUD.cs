@@ -51,7 +51,14 @@ namespace OHTSim.Visualization3D
         void UpdateMode(SimEvents.CameraMode mode)
         {
             if (modeLabel != null)
-                modeLabel.text = mode == SimEvents.CameraMode.FullscreenTopView ? "TOP VIEW (ESC to exit)" : "MINIMAP (click to expand)";
+            {
+                if (mode == SimEvents.CameraMode.FullscreenTopView)
+                    modeLabel.text = "TOP VIEW (ESC to exit)";
+                else if (mode == SimEvents.CameraMode.Cameraman)
+                    modeLabel.text = "🎥 DRONE (WASD to Walk, Shift: Boost, Scroll: FPV/3PS, ESC: exit)";
+                else
+                    modeLabel.text = "MINIMAP (click to expand / C: Drone View)";
+            }
         }
     }
 }

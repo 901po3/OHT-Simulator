@@ -10,6 +10,9 @@ namespace OHTSim.Visualization3D
     /// </summary>
     public class Map3DBuilder : MonoBehaviour
     {
+        /// <summary>미니맵/탑뷰 카메라에서만 보이는 혼잡도 오버레이 레이어 인덱스.</summary>
+        public const int MinimapOnlyLayer = 31;
+
         [Header("필수 의존성")]
         public NodePrefabRegistry   prefabRegistry;
         public VisualizationConfig  config;
@@ -152,7 +155,68 @@ namespace OHTSim.Visualization3D
             float nodeRadius = 0.8f;
             seg.Setup(fromW, toW, prefabRegistry.railWidth, prefabRegistry.railHeight, nodeRadius);
 
+            // ── 미니맵 전용 혼잡도 오버레이 ──────────────────────────
+            CreateCongestionOverlay(go.transform, seg, fromW, toW, nodeRadius);
+
             _railSegments[key] = seg;
+        }
+
+        /// <summary>
+        /// 레일 위에 얇고 평평한 발광 큐브를 생성한다. MinimapOnly 레이어에 두어
+        /// 메인 3D 카메라에서는 보이지 않고 미니맵/탑뷰에서만 혼잡도 히트맵으로 보인다.
+        /// </summary>
+        void CreateCongestionOverlay(Transform railTransform, RailSegment seg, Vector3 fromW, Vector3 toW, float nodeRadius)
+        {
+            Vector3 dir = toW - fromW;
+            float len = dir.magnitude;
+            if (len < 0.001f) return;
+            Vector3 dirN = dir / len;
+            float effectiveLen = Mathf.Max(0.1f, len - nodeRadius * 2f);
+
+            var overlay = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            overlay.name = "CongestionOverlay";
+
+            // 콜라이더 제거 (시각 전용)
+            var col = overlay.GetComponent<Collider>();
+            if (col != null)
+            {
+#if UNITY_EDITOR
+                if (!Application.isPlaying) DestroyImmediate(col);
+                else                        Destroy(col);
+#else
+                Destroy(col);
+#endif
+            }
+
+            // 레일 위에 살짝 띄워 같은 구간을 덮는 얇은 판
+            overlay.transform.SetParent(railTransform, false);
+            overlay.transform.position = (fromW + toW) * 0.5f + Vector3.up * 0.3f;
+            overlay.transform.rotation = Quaternion.LookRotation(dirN, Vector3.up);
+            overlay.transform.localScale = new Vector3(prefabRegistry.railWidth * 1.2f, 0.05f, effectiveLen);
+
+            // MinimapOnly 레이어로 재귀 설정
+            SetLayerRecursive(overlay, MinimapOnlyLayer);
+
+            // URP Lit + 발광 머티리얼 인스턴스
+            var renderer = overlay.GetComponent<Renderer>();
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader != null && renderer != null)
+            {
+                var mat = new Material(shader);
+                mat.EnableKeyword("_EMISSION");
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                renderer.sharedMaterial = mat;
+            }
+
+            seg.SetCongestionOverlay(renderer);
+            seg.SetCongestion(0f);
+        }
+
+        static void SetLayerRecursive(GameObject go, int layer)
+        {
+            go.layer = layer;
+            foreach (Transform child in go.transform)
+                SetLayerRecursive(child.gameObject, layer);
         }
 
         Bounds ComputeBounds()

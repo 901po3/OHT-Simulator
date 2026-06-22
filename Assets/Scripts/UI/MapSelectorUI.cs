@@ -45,12 +45,15 @@ namespace OHTSim.UI
             }
 
             emptyLabel.gameObject.SetActive(false);
+            if (emptyLabel != null) TextSharpener.SharpenText(emptyLabel);
 
             foreach (string name in _mapNames)
             {
                 string captured = name;
                 Button btn = Instantiate(buttonPrefab, fileListContent);
-                btn.GetComponentInChildren<Text>().text = captured;
+                var txt = btn.GetComponentInChildren<Text>();
+                txt.text = captured;
+                TextSharpener.SharpenText(txt);
                 btn.onClick.AddListener(() => SelectMap(captured));
             }
         }

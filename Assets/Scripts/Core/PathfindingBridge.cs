@@ -202,7 +202,7 @@ namespace OHTSim.Core
                 if (cur == to) return Reconstruct(came, cur);
                 open.Remove(cur);
 
-                int curDepth = Get(depth, cur);
+                int curDepth = depth.TryGetValue(cur, out int d) ? d : 0;
                 foreach (var e in cur.edges)
                 {
                     int nextDepth = curDepth + 1;  // 다음 노드 도달까지의 프레임 수

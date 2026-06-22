@@ -14,6 +14,15 @@ namespace OHTSim.Visualization3D
         public float   Length  { get; private set; }
         public Vector3 Direction { get; private set; }
 
+        // ── 미니맵 전용 혼잡도 오버레이 ──────────────────────────────
+        // Map3DBuilder가 별도 생성한 발광 오버레이(레일 위 얇은 큐브, MinimapOnly 레이어)를 등록받아
+        // 혼잡도(0~1)에 따라 색/발광을 보간한다.
+        [SerializeField] Renderer _congestionRenderer;
+        Material _congestionMaterial;
+
+        static readonly int _colorId    = Shader.PropertyToID("_BaseColor");
+        static readonly int _emissionId = Shader.PropertyToID("_EmissionColor");
+
         /// <summary>
         /// 양 끝 좌표를 받아 노드 반경만큼 잘라낸 후 정중앙에 배치, Z축이 진행 방향이 되도록 회전.
         /// </summary>
@@ -44,6 +53,29 @@ namespace OHTSim.Visualization3D
         {
             t = Mathf.Clamp01(t);
             return Vector3.Lerp(FromPos, ToPos, t);
+        }
+
+        /// <summary>Map3DBuilder가 생성한 혼잡도 오버레이 렌더러를 등록한다.</summary>
+        public void SetCongestionOverlay(Renderer overlayRenderer)
+        {
+            _congestionRenderer = overlayRenderer;
+            if (_congestionRenderer != null)
+                _congestionMaterial = _congestionRenderer.material; // 인스턴스 머티리얼
+        }
+
+        /// <summary>혼잡도(0~1)에 따라 오버레이 색/발광을 보간한다. 0=투명한 어두운 파랑, 1=네온 빨강.</summary>
+        public void SetCongestion(float t01)
+        {
+            if (_congestionRenderer == null || _congestionMaterial == null) return;
+
+            t01 = Mathf.Clamp01(t01);
+            Color low  = new Color(0.1f, 0.2f, 0.6f);   // 저혼잡: 어두운 파랑
+            Color high = new Color(1f,   0.1f, 0.05f);  // 고혼잡: 네온 빨강
+            Color baseCol = Color.Lerp(low, high, t01);
+
+            _congestionMaterial.SetColor(_colorId, baseCol);
+            // 미니맵 블룸용 HDR 발광
+            _congestionMaterial.SetColor(_emissionId, baseCol * (0.5f + t01 * 2.5f));
         }
     }
 }

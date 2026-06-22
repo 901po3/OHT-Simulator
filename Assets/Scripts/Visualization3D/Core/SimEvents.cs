@@ -21,7 +21,7 @@ namespace OHTSim.Visualization3D
         public static event Action<float /*multiplier*/> SpeedMultiplierChanged;
 
         // 카메라 모드
-        public enum CameraMode { ThirdPerson, FullscreenTopView }
+        public enum CameraMode { ThirdPerson, FullscreenTopView, Cameraman }
         public static event Action<CameraMode> CameraModeChanged;
 
         // 발행자(publisher) 헬퍼 — null 체크 일관성

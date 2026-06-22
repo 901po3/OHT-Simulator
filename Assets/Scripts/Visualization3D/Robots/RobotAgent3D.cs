@@ -41,6 +41,25 @@ namespace OHTSim.Visualization3D
             { NodeType.Deposition, NodeType.Exposure, NodeType.Etching, NodeType.Cleaning };
         int _processStep = -1;
 
+        // ── LED & FOUP (런타임 생성, 풀링 안전) ───────────────────────────
+        // 풀에서 재대여될 때 자식이 중복 생성되지 않도록 1회만 생성.
+        bool _childrenCreated;
+        Renderer _ledRenderer;
+        Material _ledMaterial;
+        Transform _foup;
+
+        const float LED_EMISSION_INTENSITY = 2.5f; // HDR 블룸용 발광 강도
+
+        // FOUP 로컬 Y 위치
+        const float FOUP_CARRIED_Y  = -0.4f; // 로봇 본체 아래 매달린(운반) 위치
+        const float FOUP_LOWER_DROP =  1.5f; // 하강 거리 — docked 위치는 carried - drop
+        const float PHASE_DURATION  =  0.5f; // 승/하강 연출 시간(초)
+
+        // 공정 서브 페이즈 (코루틴 없이 Update 기반 — 풀링 안전)
+        enum ProcessPhase { Lowering, Working, Raising }
+        ProcessPhase _processPhase;
+        float _phaseTimer;
+
         public void Initialize(OHTMapData map, string spawnNodeId)
         {
             _map     = map;
@@ -48,12 +67,55 @@ namespace OHTSim.Visualization3D
             _config  = GameServices.Config;
             CurrentNodeId = spawnNodeId;
 
+            EnsureChildrenCreated();
+
             var node = _builder.GetNodeView(spawnNodeId);
             if (node != null)
                 transform.position = node.WorldPos + Vector3.up * _config.robotHoverHeight;
 
-            CurrentState = State.Idle;
+            // 풀 재대여 시 FOUP를 운반 위치로 리셋
+            SetFoupY(FOUP_CARRIED_Y);
+
             _path.Clear();
+            SetState(State.Idle);
+        }
+
+        // 자식 오브젝트(LED 비콘 + FOUP)를 1회만 생성. 풀링으로 재활성화돼도 중복 생성 안 함.
+        void EnsureChildrenCreated()
+        {
+            if (_childrenCreated) return;
+            _childrenCreated = true;
+
+            var litShader = Shader.Find("Universal Render Pipeline/Lit");
+
+            // 상태 LED 비콘 — 로봇 상단의 작은 발광 구체
+            var led = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            led.name = "StatusLED";
+            led.transform.SetParent(transform, false);
+            led.transform.localPosition = new Vector3(0f, 0.6f, 0f);
+            led.transform.localScale = Vector3.one * 0.25f;
+            var ledCol = led.GetComponent<SphereCollider>();
+            if (ledCol != null) Destroy(ledCol); // 물리 오버헤드 제거
+
+            _ledRenderer = led.GetComponent<Renderer>();
+            _ledMaterial = new Material(litShader);
+            _ledMaterial.EnableKeyword("_EMISSION");
+            _ledRenderer.material = _ledMaterial;
+
+            // FOUP(웨이퍼 박스) 언더캐리지 — 로봇 아래 매달린 반투명 청회색 큐브
+            var foup = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            foup.name = "FOUP";
+            foup.transform.SetParent(transform, false);
+            foup.transform.localPosition = new Vector3(0f, FOUP_CARRIED_Y, 0f);
+            foup.transform.localScale = Vector3.one * 0.4f;
+            var foupCol = foup.GetComponent<BoxCollider>();
+            if (foupCol != null) Destroy(foupCol);
+
+            var foupRenderer = foup.GetComponent<Renderer>();
+            var foupMat = new Material(litShader) { color = new Color(0.5f, 0.6f, 0.8f, 1f) };
+            foupRenderer.material = foupMat;
+
+            _foup = foup.transform;
         }
 
         void Update()
@@ -133,10 +195,46 @@ namespace OHTSim.Visualization3D
 
         void TickProcessing()
         {
-            // 의도: SpeedMultiplier가 시뮬레이션 전체 속도. 이동·처리 모두 동일 배율 적용.
-            // 사용자가 "속도 5×"를 선택하면 처리 시간도 5배 빠르게 — 직관적 시뮬 가속.
-            _processTimer -= Time.deltaTime * GameServices.SpeedMultiplier;
-            if (_processTimer <= 0f) CurrentState = State.Idle;
+            // 의도: SpeedMultiplier가 시뮬레이션 전체 속도. 이동·처리·승하강 모두 동일 배율 적용.
+            // 사용자가 "속도 5×"를 선택하면 처리/연출 시간도 5배 빠르게 — 직관적 시뮬 가속.
+            float dt = Time.deltaTime * GameServices.SpeedMultiplier;
+
+            switch (_processPhase)
+            {
+                // ① 하강: FOUP를 운반 위치에서 도크(로드포트) 위치로 내림
+                case ProcessPhase.Lowering:
+                {
+                    _phaseTimer += dt;
+                    float t = Mathf.Clamp01(_phaseTimer / PHASE_DURATION);
+                    SetFoupY(Mathf.Lerp(FOUP_CARRIED_Y, FOUP_CARRIED_Y - FOUP_LOWER_DROP, t));
+                    if (t >= 1f) _processPhase = ProcessPhase.Working;
+                    break;
+                }
+                // ② 작업: 기존 공정 타이머 카운트다운
+                case ProcessPhase.Working:
+                {
+                    _processTimer -= dt;
+                    if (_processTimer <= 0f)
+                    {
+                        _phaseTimer = 0f;
+                        _processPhase = ProcessPhase.Raising;
+                    }
+                    break;
+                }
+                // ③ 상승: FOUP를 다시 운반 위치로 올린 뒤 Idle로 복귀
+                case ProcessPhase.Raising:
+                {
+                    _phaseTimer += dt;
+                    float t = Mathf.Clamp01(_phaseTimer / PHASE_DURATION);
+                    SetFoupY(Mathf.Lerp(FOUP_CARRIED_Y - FOUP_LOWER_DROP, FOUP_CARRIED_Y, t));
+                    if (t >= 1f)
+                    {
+                        SetFoupY(FOUP_CARRIED_Y);
+                        SetState(State.Idle);
+                    }
+                    break;
+                }
+            }
         }
 
         // ── 헬퍼 ───────────────────────────────────────────────────────
@@ -151,14 +249,14 @@ namespace OHTSim.Visualization3D
             var nextView = _builder.GetNodeView(nextId);
             if (nextView == null)
             {
-                CurrentState = State.Idle;
+                SetState(State.Idle);
                 return;
             }
             _moveFrom = transform.position;
             _moveTo   = nextView.WorldPos + Vector3.up * _config.robotHoverHeight;
             _moveProgress = 0f;
             CurrentNodeId = nextId;
-            CurrentState = State.Moving;
+            SetState(State.Moving);
         }
 
         void ArriveAtHop()
@@ -169,8 +267,41 @@ namespace OHTSim.Visualization3D
 
         void StartProcessing()
         {
-            CurrentState = State.Processing;
             _processTimer = ProcessTime(_map.FindNode(CurrentNodeId)?.type ?? NodeType.Normal);
+            _processPhase = ProcessPhase.Lowering; // FOUP 하강부터 시작
+            _phaseTimer = 0f;
+            SetState(State.Processing);
+        }
+
+        // ── 상태/연출 헬퍼 ──────────────────────────────────────────────
+        // 모든 상태 전환은 이 메서드를 통해 — LED 색을 항상 동기화.
+        void SetState(State newState)
+        {
+            CurrentState = newState;
+            UpdateLedColor(newState);
+        }
+
+        void UpdateLedColor(State state)
+        {
+            if (_ledMaterial == null) return;
+            Color c = state switch
+            {
+                State.Idle       => new Color(0f,   1f,   0.3f),
+                State.Moving     => new Color(0f,   0.9f, 1f),
+                State.Processing => new Color(1f,   0.15f, 0.1f),
+                State.Returning  => new Color(1f,   0f,   0.8f),
+                _                => Color.white,
+            };
+            _ledMaterial.color = c;
+            _ledMaterial.SetColor("_EmissionColor", c * LED_EMISSION_INTENSITY);
+        }
+
+        void SetFoupY(float y)
+        {
+            if (_foup == null) return;
+            var p = _foup.localPosition;
+            p.y = y;
+            _foup.localPosition = p;
         }
 
         MapNode PickNearestNodeOfType(NodeType type)

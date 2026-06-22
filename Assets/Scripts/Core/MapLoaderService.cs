@@ -29,14 +29,14 @@ namespace OHTSim.Core
             string xml = File.ReadAllText(path, System.Text.Encoding.UTF8);
             CurrentMap = MapXmlParser.Parse(xml);
             CurrentMap.BuildAdjacency();  // PathfindingBridge / AgentController용 인접 리스트
-            _builder.Build(CurrentMap);
+            if (_builder != null) _builder.Build(CurrentMap);
             Debug.Log($"[MapLoaderService] 로드 완료: {fileName} — 노드 {CurrentMap.nodes.Count}개, 엣지 {CurrentMap.edges.Count}개");
         }
 
         public void UnloadMap()
         {
             CurrentMap = null;
-            _builder.Clear();
+            if (_builder != null) _builder.Clear();
         }
 
         // StreamingAssets/Maps/ 내 .xml 파일 목록
