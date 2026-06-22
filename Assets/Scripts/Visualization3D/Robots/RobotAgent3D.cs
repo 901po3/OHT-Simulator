@@ -36,6 +36,17 @@ namespace OHTSim.Visualization3D
         Map3DBuilder _builder;
         VisualizationConfig _config;
 
+        // ── 노드 점유(겹침 방지) ──────────────────────────────────────────
+        // 설계 제약: "겹치는 노드 최대 1대, 레일은 무제한 통행" (docs/ALGORITHM_DECISIONS.md)
+        // 다음 노드로 출발하기 전 NodeOccupancyService에 점유를 요청하고, 성공해야만 이동한다.
+        // 점유 실패 시 현재 노드에서 대기하다, 타임아웃되면 경로를 폐기하고 리라우팅한다.
+        float _blockTimer;                          // 다음 노드가 막혀 대기한 누적 시간
+        const float BLOCK_REROUTE_TIMEOUT = 2.5f;   // 이 시간 이상 막히면 경로 폐기 후 재탐색
+        // 초과 로봇(노드 수보다 많은 경우)이 레일에서 대기 시, 가까운 빈 노드 탐색 기준 좌표
+        float _railRefX, _railRefY;
+        // 초과 로봇을 레일 위에 분산 배치하기 위한 슬롯 카운터
+        static int _railSlotCounter;
+
         // 공정 순환 사이클
         static readonly NodeType[] PROCESS_CYCLE =
             { NodeType.Deposition, NodeType.Exposure, NodeType.Etching, NodeType.Cleaning };
@@ -63,24 +74,59 @@ namespace OHTSim.Visualization3D
         ProcessPhase _processPhase;
         float _phaseTimer;
 
-        public void Initialize(OHTMapData map, string spawnNodeId)
+        public void Initialize(OHTMapData map, string preferredNodeId)
         {
             _map     = map;
             _builder = GameServices.MapBuilder;
             _config  = GameServices.Config;
-            CurrentNodeId = spawnNodeId;
 
             EnsureChildrenCreated();
 
-            var node = _builder.GetNodeView(spawnNodeId);
-            if (node != null)
-                transform.position = node.WorldPos + Vector3.up * _config.robotHoverHeight;
-
-            // 풀 재대여 시 FOUP를 운반 위치로 리셋
+            // 풀 재대여 시 상태 리셋
             SetFoupY(FOUP_CARRIED_Y);
-
             _path.Clear();
+            _processStep  = -1;
+            _blockTimer   = 0f;
+            _idleCooldown = 0f;
+            TargetNodeId  = null;
+
+            // ── 점유 가능한 스폰 노드 확보 (한 노드 1대 불변식) ──
+            // 우선순위: 지정 노드 → 빈 Depot(없으면 아무 빈 노드). 모두 실패하면 초과분 → 레일 대기.
+            string spawn = null;
+            if (NodeOccupancyService.TryClaim(preferredNodeId, this))
+            {
+                spawn = preferredNodeId;
+            }
+            else
+            {
+                string free = NodeOccupancyService.FindFreeNode(map, this, n => n.type == NodeType.Depot);
+                if (free != null && NodeOccupancyService.TryClaim(free, this))
+                    spawn = free;
+            }
+
+            CurrentNodeId = spawn;
+
+            if (spawn != null)
+            {
+                var node = _builder.GetNodeView(spawn);
+                if (node != null)
+                    transform.position = node.WorldPos + Vector3.up * _config.robotHoverHeight;
+            }
+            else
+            {
+                // 초과 로봇: 노드가 만석이므로 레일 위에서 대기
+                PlaceOnRailFallback();
+            }
+
             SetState(State.Idle);
+        }
+
+        // 풀 반환/파괴/비활성화 시 점유 노드를 반드시 해제 — 다른 로봇이 그 노드를 쓸 수 있게.
+        void OnDisable()
+        {
+            NodeOccupancyService.Release(CurrentNodeId, this);
+            CurrentNodeId = null;
+            _path.Clear();
         }
 
         // 자식 오브젝트(LED 비콘 + FOUP + 미니맵 마커)를 1회만 생성. 풀링으로 재활성화돼도 중복 생성 안 함.
@@ -154,18 +200,36 @@ namespace OHTSim.Visualization3D
         // ── 상태별 ─────────────────────────────────────────────────────
         void TickIdle()
         {
-            // 매 프레임 path 재탐색 방지 — 직전 실패 시 쿨다운만큼 대기.
+            // 초과 로봇(레일 대기): 빈 노드를 찾아 진입 시도
+            if (CurrentNodeId == null) { TickRailWaiting(); return; }
+
+            // 경로가 남아 있는데 Idle = 다음 노드가 막혀 대기 중. 점유 재시도 + 타임아웃 시 리라우팅.
+            if (_path.Count > 0)
+            {
+                _blockTimer += Time.deltaTime;
+                if (_blockTimer >= BLOCK_REROUTE_TIMEOUT)
+                {
+                    _path.Clear();              // 경로 폐기 → 다음 사이클에서 새 목표/경로
+                    _blockTimer = 0f;
+                    _idleCooldown = IDLE_RETRY_COOLDOWN;
+                    return;
+                }
+                TryAdvanceHop();
+                return;
+            }
+
+            // 매 프레임 재탐색 방지 — 직전 실패 시 쿨다운만큼 대기.
             if (_idleCooldown > 0f)
             {
                 _idleCooldown -= Time.deltaTime;
                 return;
             }
 
-            // 다음 공정 노드 선택
+            // 다음 공정 노드 선택 (점유되지 않은 빈 노드만)
             int nextStep = (_processStep + 1) % PROCESS_CYCLE.Length;
             var targetType = PROCESS_CYCLE[nextStep];
 
-            MapNode target = PickNearestNodeOfType(targetType);
+            MapNode target = PickNearestFreeNodeOfType(targetType);
             if (target == null) { _idleCooldown = IDLE_RETRY_COOLDOWN; return; }
 
             var fromNode = _map.FindNode(CurrentNodeId);
@@ -183,7 +247,40 @@ namespace OHTSim.Visualization3D
             TargetNodeId = target.id;
             _path.Clear();
             for (int i = 1; i < pathNodes.Count; i++) _path.Enqueue(pathNodes[i].id);
-            AdvanceToNextHop();
+            _blockTimer = 0f;
+            TryAdvanceHop();
+        }
+
+        // 초과 로봇이 레일에서 대기하다, 빈 노드가 생기면 진입한다.
+        void TickRailWaiting()
+        {
+            if (_idleCooldown > 0f) { _idleCooldown -= Time.deltaTime; return; }
+
+            // 가까운 빈 노드 탐색 — Depot 우선, 없으면 아무 노드
+            string dest = NodeOccupancyService.FindFreeNode(
+                _map, this, n => n.type == NodeType.Depot, _railRefX, _railRefY, true);
+
+            if (dest == null || !NodeOccupancyService.TryClaim(dest, this))
+            {
+                _idleCooldown = IDLE_RETRY_COOLDOWN; // 여전히 만석 → 레일 대기 유지
+                return;
+            }
+
+            var view = _builder.GetNodeView(dest);
+            if (view == null)
+            {
+                NodeOccupancyService.Release(dest, this);
+                _idleCooldown = IDLE_RETRY_COOLDOWN;
+                return;
+            }
+
+            // 레일 → 노드 진입
+            CurrentNodeId = dest;
+            _path.Clear();
+            _moveFrom = transform.position;
+            _moveTo   = view.WorldPos + Vector3.up * _config.robotHoverHeight;
+            _moveProgress = 0f;
+            SetState(State.Moving);
         }
 
         void TickMoving()
@@ -259,31 +356,61 @@ namespace OHTSim.Visualization3D
         }
 
         // ── 헬퍼 ───────────────────────────────────────────────────────
-        void AdvanceToNextHop()
+        // 다음 홉으로 진행 시도. 다음 노드를 점유할 수 있을 때만 이동하고,
+        // 점유 실패 시 현재 노드에서 대기한다 (경로는 보존 → TickIdle이 재시도).
+        void TryAdvanceHop()
         {
             if (_path.Count == 0)
             {
-                StartProcessing();
+                ArriveAtDestination();
                 return;
             }
-            string nextId = _path.Dequeue();
+
+            string nextId = _path.Peek();
             var nextView = _builder.GetNodeView(nextId);
             if (nextView == null)
             {
+                // 뷰 누락(맵 변경 등) → 경로 폐기 후 재탐색
+                _path.Clear();
+                _idleCooldown = IDLE_RETRY_COOLDOWN;
                 SetState(State.Idle);
                 return;
             }
+
+            // 다음 노드 점유 시도 — 실패 시 현재 노드에서 대기 (레일은 무제한이나 노드는 1대)
+            if (!NodeOccupancyService.TryClaim(nextId, this))
+            {
+                SetState(State.Idle); // 현재 노드 점유를 유지한 채 대기
+                return;
+            }
+
+            // 점유 성공 → 출발. 현재 노드를 즉시 해제하여 레일로 진입(다른 로봇/초과분이 사용 가능).
+            _path.Dequeue();
+            string from = CurrentNodeId;
+            if (!string.IsNullOrEmpty(from) && from != nextId)
+                NodeOccupancyService.Release(from, this);
+            CurrentNodeId = nextId; // 이제 nextId 소유 — 이동 중에도 예약 유지(겹침 불가)
+
             _moveFrom = transform.position;
             _moveTo   = nextView.WorldPos + Vector3.up * _config.robotHoverHeight;
             _moveProgress = 0f;
-            CurrentNodeId = nextId;
+            _blockTimer = 0f;
             SetState(State.Moving);
         }
 
         void ArriveAtHop()
         {
-            if (_path.Count > 0) AdvanceToNextHop();
-            else StartProcessing();
+            transform.position = _moveTo;
+            if (_path.Count > 0) { TryAdvanceHop(); return; }
+            ArriveAtDestination();
+        }
+
+        // 목적지 노드 도착: 공정 노드면 처리 시작, 그 외(Normal/Depot)면 Idle로 다음 목표 탐색.
+        void ArriveAtDestination()
+        {
+            var node = _map.FindNode(CurrentNodeId);
+            if (node != null && IsProcessType(node.type)) StartProcessing();
+            else SetState(State.Idle);
         }
 
         void StartProcessing()
@@ -332,19 +459,71 @@ namespace OHTSim.Visualization3D
             _foup.localPosition = p;
         }
 
-        MapNode PickNearestNodeOfType(NodeType type)
+        // 점유되지 않은(빈) 목표 타입 노드 중 가장 가까운 것을 고른다.
+        MapNode PickNearestFreeNodeOfType(NodeType type)
         {
             MapNode cur = _map.FindNode(CurrentNodeId);
-            if (cur == null) return null;
+            float rx = cur != null ? cur.x : _railRefX;
+            float ry = cur != null ? cur.y : _railRefY;
             MapNode best = null;
             float bestDist = float.MaxValue;
             foreach (var n in _map.nodes)
             {
                 if (n.type != type) continue;
-                float d = Mathf.Abs(n.x - cur.x) + Mathf.Abs(n.y - cur.y);
+                if (!NodeOccupancyService.IsClaimable(n.id, this)) continue; // 빈 노드만
+                float d = Mathf.Abs(n.x - rx) + Mathf.Abs(n.y - ry);
                 if (d < bestDist) { bestDist = d; best = n; }
             }
             return best;
+        }
+
+        static bool IsProcessType(NodeType t)
+            => t == NodeType.Deposition || t == NodeType.Exposure ||
+               t == NodeType.Etching   || t == NodeType.Cleaning;
+
+        // 초과 로봇을 레일(엣지) 위에 분산 배치한다. 엣지마다 여러 위치(t)로 흩어 겹침을 줄인다.
+        // (설계상 레일 위 다중 점유는 허용되지만, 시각적 겹침을 최소화한다.)
+        void PlaceOnRailFallback()
+        {
+            if (_map.edges.Count == 0)
+            {
+                // 엣지가 없으면 첫 노드 근처에 둠
+                if (_map.nodes.Count > 0)
+                {
+                    var n0 = _map.nodes[0];
+                    var v0 = _builder.GetNodeView(n0.id);
+                    if (v0 != null) transform.position = v0.WorldPos + Vector3.up * _config.robotHoverHeight;
+                    _railRefX = n0.x; _railRefY = n0.y;
+                }
+                return;
+            }
+
+            int slot    = _railSlotCounter++;
+            int edgeIdx = slot % _map.edges.Count;
+            int band    = (slot / _map.edges.Count) % 4;   // 엣지당 4개 위치 밴드
+            float t     = 0.3f + 0.4f * (band / 3f);        // 0.3 ~ 0.7
+
+            var edge = _map.edges[edgeIdx];
+            var from = _map.FindNode(edge.fromId);
+            var to   = _map.FindNode(edge.toId);
+            var vf   = from != null ? _builder.GetNodeView(from.id) : null;
+            var vt   = to   != null ? _builder.GetNodeView(to.id)   : null;
+
+            if (vf != null && vt != null)
+            {
+                transform.position = Vector3.Lerp(vf.WorldPos, vt.WorldPos, t) + Vector3.up * _config.robotHoverHeight;
+                _railRefX = to.x; _railRefY = to.y; // 진행 방향 노드를 탐색 기준으로
+            }
+            else if (vt != null)
+            {
+                transform.position = vt.WorldPos + Vector3.up * _config.robotHoverHeight;
+                _railRefX = to.x; _railRefY = to.y;
+            }
+            else if (vf != null)
+            {
+                transform.position = vf.WorldPos + Vector3.up * _config.robotHoverHeight;
+                _railRefX = from.x; _railRefY = from.y;
+            }
         }
 
         static float ProcessTime(NodeType type) => type switch

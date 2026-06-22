@@ -96,6 +96,11 @@ namespace OHTSim.Visualization3D
                 _robotsRoot = null;
             }
             _pool = null;
+
+            // 노드 점유 레지스트리 초기화 — 새 맵/사이클은 빈 점유 상태에서 시작.
+            // (로봇 OnDisable이 개별 해제하지만, 일괄 Clear로 잔여 점유를 확실히 제거)
+            NodeOccupancyService.Clear();
+
             SimEvents.RaiseActiveRobotCountChanged(0);
         }
 
