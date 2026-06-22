@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { Stage, Layer, Circle, Arrow, Text, Group, Rect } from 'react-konva';
 import type Konva from 'konva';
 import { useEditorStore } from '../../store/editorStore';
@@ -23,6 +23,23 @@ export function SimMapCanvas({ width, height }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageScale, setStageScale] = useState(1);
+  const [stageRotation, setStageRotation] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
+      if (e.key === 'q' || e.key === 'Q') setStageRotation(r => r - 15);
+      else if (e.key === 'e' || e.key === 'E') setStageRotation(r => r + 15);
+      else if (e.key === 'r' || e.key === 'R') {
+        setStageRotation(0);
+        setStagePos({ x: 0, y: 0 });
+        setStageScale(1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // O(1) 노드 조회 — 대규모 맵(수백 노드)에서 find() 선형탐색 제거
   const nodeById = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
@@ -138,6 +155,20 @@ export function SimMapCanvas({ width, height }: Props) {
         ))}
       </div>
 
+      {/* 컨트롤 안내 */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12, zIndex: 10,
+        background: '#161b22cc', border: '1px solid #30363d',
+        borderRadius: 6, padding: '8px 12px',
+        fontSize: 11, color: '#8b949e', pointerEvents: 'none',
+        backdropFilter: 'blur(4px)', lineHeight: 1.6,
+      }}>
+        <div>Pan: drag empty space</div>
+        <div>Zoom: mouse wheel</div>
+        <div>Rotate: Q / E</div>
+        <div>Reset: R</div>
+      </div>
+
       <Stage
         ref={stageRef}
         width={width}
@@ -146,6 +177,7 @@ export function SimMapCanvas({ width, height }: Props) {
         y={stagePos.y}
         scaleX={stageScale}
         scaleY={stageScale}
+        rotation={stageRotation}
         draggable
         onDragMove={onStageDragMove}
         onDragEnd={onStageDragMove}

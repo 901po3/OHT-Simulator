@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer, Circle, Line, Arrow, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import { useEditorStore } from '../../store/editorStore';
@@ -32,8 +32,26 @@ export function EditorCanvas({ width, height }: Props) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageScale, setStageScale] = useState(1);
+  const [stageRotation, setStageRotation] = useState(0);
   const [dragOverEdge, setDragOverEdge] = useState<string | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+
+  // 키보드: Q/E 회전, R 리셋
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
+      if (e.key === 'q' || e.key === 'Q') setStageRotation(r => r - 15);
+      else if (e.key === 'e' || e.key === 'E') setStageRotation(r => r + 15);
+      else if (e.key === 'r' || e.key === 'R') {
+        setStageRotation(0);
+        setStagePos({ x: 0, y: 0 });
+        setStageScale(1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // 수동 패닝 상태 (Konva Stage draggable 대신 사용)
   const panRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
@@ -293,6 +311,20 @@ export function EditorCanvas({ width, height }: Props) {
         ))}
       </div>
 
+      {/* 컨트롤 안내 */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12, zIndex: 10,
+        background: '#161b22cc', border: '1px solid #30363d',
+        borderRadius: 6, padding: '8px 12px',
+        fontSize: 11, color: '#8b949e', pointerEvents: 'none',
+        backdropFilter: 'blur(4px)', lineHeight: 1.6,
+      }}>
+        <div>Pan: drag empty space</div>
+        <div>Zoom: mouse wheel</div>
+        <div>Rotate: Q / E</div>
+        <div>Reset: R</div>
+      </div>
+
       <Stage
         ref={stageRef}
         width={width}
@@ -301,6 +333,7 @@ export function EditorCanvas({ width, height }: Props) {
         y={stagePos.y}
         scaleX={stageScale}
         scaleY={stageScale}
+        rotation={stageRotation}
         onMouseMove={onStageMouseMove}
         onMouseDown={onStageMouseDown}
         onMouseUp={onStageMouseUp}
