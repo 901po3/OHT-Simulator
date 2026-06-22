@@ -252,8 +252,8 @@ export function ConsiderationsPage() {
           <Card>
             <p style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.85, margin: 0 }}>
               이 OHT-System은 <strong style={{ color: '#3fb950' }}>교착 회피의 구조적 해결</strong>과
-              <strong style={{ color: '#3fb950' }}>기본 경로탐색 최적화</strong>에 집중한 교육용 시뮬레이터입니다.
-              실제 반도체 FAB의 OHT를 운영하려면, 위의 제약들을 하나씩 추가하고, 각각에 맞는 알고리즘을 연구해야 합니다.
+              <strong style={{ color: '#3fb950' }}>기본 경로탐색 최적화</strong>에 집중해 제작한 포트폴리오용 시뮬레이터입니다.
+              실제 반도체 FAB의 OHT를 운영하려면 위의 제약들을 하나씩 더해 가며, 각각에 맞는 알고리즘을 연구해야 합니다.
               <br/><br/>
               <strong style={{ color: '#e6edf3' }}>추천 다음 단계:</strong>
             </p>
