@@ -620,9 +620,15 @@ export const useSimRunStore = create<SimRunState>((set, get) => ({
         cur = nextMover && !nextMover.claimed ? nextMover : undefined;
       }
       if (cur && cur.vs === 1) {
-        // 사이클 발견 → cur부터 walk 끝까지가 루프 → 전원 동시 전진
+        // 사이클 발견 → cur부터 walk 끝까지가 루프.
         const idx = walk.indexOf(cur);
-        for (let i = idx; i < walk.length; i++) claim(walk[i]);
+        const cycleLen = walk.length - idx;
+        // 길이 2 루프(A↔B)는 같은 레일을 맞바꾸는 정면 교차이므로 회전 금지.
+        // (단방향 그리드는 역방향 엣지가 없어 2-cycle 자체가 불가 → 비용 0.
+        //  양방향 맵에서는 둘 다 Waiting→재경로로 자연 해소.)
+        if (cycleLen >= 3) {
+          for (let i = idx; i < walk.length; i++) claim(walk[i]);
+        }
       }
       for (const w of walk) w.vs = 2;
     }

@@ -7,6 +7,7 @@ import { exportToXml, downloadXml } from '../../core/export/xmlSerializer';
 const NAV_ITEMS = [
   { to: '/editor',       label: '맵 에디터' },
   { to: '/algorithm',    label: '길찾기 알고리즘 선택 과정' },
+  { to: '/map-design',   label: '맵 설계 고려사항' },
   { to: '/architecture', label: '코드 구조' },
   { to: '/process',      label: '나를 위한 반도체 공정 요약' },
 ];

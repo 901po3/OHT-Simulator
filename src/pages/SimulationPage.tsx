@@ -10,6 +10,7 @@ const PROCESS_CYCLE = ['증착', '노광', '식각', '세정'];
 const STATE_COLOR: Record<string, string> = {
   Idle:       '#8b949e',
   Moving:     '#58a6ff',
+  Waiting:    '#d29922',
   Processing: '#3fb950',
 };
 
