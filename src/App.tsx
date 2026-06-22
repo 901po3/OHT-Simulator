@@ -7,8 +7,35 @@ import { MapDesignPage } from './pages/MapDesignPage';
 import { ConsiderationsPage } from './pages/ConsiderationsPage';
 import { SimulationPage } from './pages/SimulationPage';
 import { ArchitecturePage } from './pages/ArchitecturePage';
+import { useIsMobile } from './hooks/useIsMobile';
+import { MobileLayout } from './components/mobile/MobileLayout';
+import { EditorMobile } from './components/mobile/EditorMobile';
+import { SimulationMobile } from './components/mobile/SimulationMobile';
+import { AlgorithmMobile } from './components/mobile/AlgorithmMobile';
 
 export default function App() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <BrowserRouter>
+        <MobileLayout>
+          <Routes>
+            <Route path="/"               element={<Navigate to="/editor" replace />} />
+            <Route path="/editor"         element={<EditorMobile />} />
+            <Route path="/simulation"     element={<SimulationMobile />} />
+            <Route path="/algorithm"      element={<AlgorithmMobile />} />
+            {/* Text-heavy pages: reuse PC components — mobile CSS adjusts font/padding/tables. */}
+            <Route path="/map-design"     element={<div className="mobile-doc"><MapDesignPage /></div>} />
+            <Route path="/considerations" element={<div className="mobile-doc"><ConsiderationsPage /></div>} />
+            <Route path="/architecture"   element={<div className="mobile-doc"><ArchitecturePage /></div>} />
+            <Route path="/process"        element={<div className="mobile-doc"><ProcessPage /></div>} />
+          </Routes>
+        </MobileLayout>
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <div style={{

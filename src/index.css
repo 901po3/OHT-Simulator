@@ -1,5 +1,21 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; background: #0d1117; color: #e6edf3; }
+
+/* ── Mobile (<=768px) adjustments ── */
+@media (max-width: 768px) {
+  html, body { overflow-x: hidden; }
+  body { font-size: 15px; }
+  #root { width: 100%; border-inline: none; min-height: 100vh; text-align: left; }
+  /* Reused PC pages on mobile: allow vertical scroll and shrink heavy chrome */
+  .mobile-doc { padding: 0; }
+  .mobile-doc table { display: block; overflow-x: auto; max-width: 100%; }
+  .mobile-doc pre { overflow-x: auto; max-width: 100%; font-size: 12px; }
+  .mobile-doc h1 { font-size: 22px !important; }
+  .mobile-doc h2 { font-size: 18px !important; }
+  .mobile-doc h3 { font-size: 16px !important; }
+  /* Ensure tap targets */
+  button, a { min-height: 36px; }
+}
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #161b22; }
 ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
