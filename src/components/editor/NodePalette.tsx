@@ -306,7 +306,7 @@ export function NodePalette() {
 
         <div style={divider} />
 
-        {/* 새로 만들기 / 자동 생성 */}
+        {/* 새로 만들기 / 프리셋 */}
         <div style={sectionLabel}>맵 작업</div>
 
         {!confirmClear ? (
@@ -337,16 +337,16 @@ export function NodePalette() {
           onMouseEnter={e => (e.currentTarget.style.background = '#3fb95033')}
           onMouseLeave={e => (e.currentTarget.style.background = '#3fb95011')}
         >
-          <span>⚡</span> 자동 생성 {presetOpen ? '▲' : '▼'}
+          <span>⚡</span> 프리셋 {presetOpen ? '▲' : '▼'}
         </button>
 
         {presetOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
             {([
-              { label: '소형', sub: '공정 1×4 · 13노드', fn: buildSmallMap,  color: '#58a6ff' },
-              { label: '중형', sub: '공정 2×4 · 20노드', fn: buildMediumMap, color: '#ffa657' },
-              { label: '대형', sub: '공정 3×4 · 30노드', fn: buildLargeMap,  color: '#bc8cff' },
-              { label: '초대형 팹 ∞', sub: '단방향 · 320노드 · 100대 무한운전', fn: buildFabMap, color: '#39d353' },
+              { label: '소형',         sub: '단방향 · 24노드 · 공정 4',     fn: buildSmallMap,  color: '#58a6ff' },
+              { label: '중형',         sub: '단방향 · 48노드 · 공정 8',     fn: buildMediumMap, color: '#ffa657' },
+              { label: '대형',         sub: '단방향 · 96노드 · 공정 18',    fn: buildLargeMap,  color: '#bc8cff' },
+              { label: '초대형 팹 ∞',  sub: '단방향 · 320노드 · 100대 무한운전', fn: buildFabMap, color: '#39d353' },
             ] as const).map(({ label, sub, fn, color }) => (
               <button
                 key={label}
@@ -385,7 +385,7 @@ export function NodePalette() {
           {connectBtn('bidirectional', '양방향', '⇄')}
         </div>
         <div style={{ fontSize: 10, color: '#444c56', marginBottom: 2 }}>
-          {connectType === 'bidirectional' ? '양쪽 방향 자동 생성' : '클릭 방향으로만 연결'}
+          {connectType === 'bidirectional' ? '양쪽 모두 연결' : '클릭 방향으로만 연결'}
         </div>
 
         <div style={divider} />

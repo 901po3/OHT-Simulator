@@ -131,17 +131,27 @@ export function SimulationPage() {
         />
       )}
 
-      {/* ── 과잉 투입 경고 배너 ── */}
-      {overcrowdWarning && (
-        <div style={{
-          background: '#d297001a', borderBottom: '1px solid #d2970066',
-          padding: '6px 14px', fontSize: 11, color: '#d29700',
+      {/* ── 과잉 투입 경고 배너 ──
+          항상 DOM에 존재하며 max-height 트랜지션으로 부드럽게 슬라이드.
+          조건부 렌더링은 아래 컨트롤 바·맵 영역의 레이아웃 시프트(어지러움)를 유발했다. */}
+      <div
+        aria-live="polite"
+        style={{
+          background: '#d297001a',
+          borderBottom: overcrowdWarning ? '1px solid #d2970066' : '1px solid transparent',
+          color: '#d29700', fontSize: 11,
+          maxHeight: overcrowdWarning ? 36 : 0,
+          opacity:   overcrowdWarning ? 1 : 0,
+          padding: overcrowdWarning ? '6px 14px' : '0 14px',
+          overflow: 'hidden',
+          transition: 'max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease',
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 14 }}>⚠</span>
-          <span>{overcrowdWarning}</span>
-        </div>
-      )}
+          pointerEvents: overcrowdWarning ? 'auto' : 'none',
+        }}
+      >
+        <span style={{ fontSize: 14 }}>⚠</span>
+        <span>{overcrowdWarning ?? ''}</span>
+      </div>
 
       {/* ── 상단 컨트롤 바 ── */}
       <div style={{
