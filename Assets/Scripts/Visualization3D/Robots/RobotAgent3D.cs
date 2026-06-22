@@ -48,12 +48,15 @@ namespace OHTSim.Visualization3D
         Material _ledMaterial;
         Transform _foup;
 
+        Renderer _minimapMarkerRenderer;
+        Material _minimapMarkerMaterial;
+
         const float LED_EMISSION_INTENSITY = 2.5f; // HDR 블룸용 발광 강도
 
         // FOUP 로컬 Y 위치
         const float FOUP_CARRIED_Y  = -0.4f; // 로봇 본체 아래 매달린(운반) 위치
-        const float FOUP_LOWER_DROP =  1.5f; // 하강 거리 — docked 위치는 carried - drop
-        const float PHASE_DURATION  =  0.5f; // 승/하강 연출 시간(초)
+        const float FOUP_LOWER_DROP =  6.0f; // 하강 거리 — 천장(5.5m)에서 바닥(0.3m)까지 하강하도록 수정
+        const float PHASE_DURATION  =  1.2f; // 승/하강 연출 시간(초) — 더 먼 거리이므로 부드럽게 증가
 
         // 공정 서브 페이즈 (코루틴 없이 Update 기반 — 풀링 안전)
         enum ProcessPhase { Lowering, Working, Raising }
@@ -80,7 +83,7 @@ namespace OHTSim.Visualization3D
             SetState(State.Idle);
         }
 
-        // 자식 오브젝트(LED 비콘 + FOUP)를 1회만 생성. 풀링으로 재활성화돼도 중복 생성 안 함.
+        // 자식 오브젝트(LED 비콘 + FOUP + 미니맵 마커)를 1회만 생성. 풀링으로 재활성화돼도 중복 생성 안 함.
         void EnsureChildrenCreated()
         {
             if (_childrenCreated) return;
@@ -101,6 +104,24 @@ namespace OHTSim.Visualization3D
             _ledMaterial = new Material(litShader);
             _ledMaterial.EnableKeyword("_EMISSION");
             _ledRenderer.material = _ledMaterial;
+
+            // 미니맵 전용 마커 (큰 구체) — MinimapOnly 레이어(31)에 배치하여 메인 3D 뷰에는 안 보이고 미니맵/탑뷰에만 크고 뚜렷하게 보임
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.name = "MinimapMarker";
+            marker.transform.SetParent(transform, false);
+            marker.transform.localPosition = new Vector3(0f, 2.0f, 0f); // 레일 위에 가려지지 않는 완벽한 수직 정렬
+            marker.transform.localScale = new Vector3(2.5f, 2.5f, 2.5f); // 미니맵 카메라에서 잘 식별되는 큼직한 스케일
+            
+            var markerCol = marker.GetComponent<SphereCollider>();
+            if (markerCol != null) Destroy(markerCol);
+
+            _minimapMarkerRenderer = marker.GetComponent<Renderer>();
+            _minimapMarkerMaterial = new Material(litShader);
+            _minimapMarkerMaterial.EnableKeyword("_EMISSION");
+            _minimapMarkerRenderer.material = _minimapMarkerMaterial;
+            
+            // MinimapOnlyLayer (31) 레이어 지정
+            marker.layer = Map3DBuilder.MinimapOnlyLayer;
 
             // FOUP(웨이퍼 박스) 언더캐리지 — 로봇 아래 매달린 반투명 청회색 큐브
             var foup = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -294,6 +315,13 @@ namespace OHTSim.Visualization3D
             };
             _ledMaterial.color = c;
             _ledMaterial.SetColor("_EmissionColor", c * LED_EMISSION_INTENSITY);
+
+            if (_minimapMarkerMaterial != null)
+            {
+                _minimapMarkerMaterial.color = c;
+                // 미니맵에서 돋보이도록 마커에 아주 선명하고 강한 고대비 발광 강도 설정
+                _minimapMarkerMaterial.SetColor("_EmissionColor", c * 4.5f);
+            }
         }
 
         void SetFoupY(float y)

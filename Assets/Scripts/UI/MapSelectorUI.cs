@@ -60,8 +60,22 @@ namespace OHTSim.UI
 
         void SelectMap(string mapName)
         {
+            // 먼저 로드를 시도하고, 성공했을 때에만 패널을 닫고 시뮬레이션 흐름으로 넘어간다.
+            bool ok = loaderService.LoadMap(mapName);
+            if (!ok)
+            {
+                // 로드 실패: 선택 패널을 유지하고 사용자에게 안내 — 앱이 멈추지 않도록.
+                panelRoot.SetActive(true);
+                if (emptyLabel != null)
+                {
+                    emptyLabel.gameObject.SetActive(true);
+                    emptyLabel.text = $"'{mapName}' 맵을 불러오지 못했습니다.\n파일 형식이 올바른지 확인한 뒤 다른 맵을 선택해주세요.";
+                    TextSharpener.SharpenText(emptyLabel);
+                }
+                return;
+            }
+
             panelRoot.SetActive(false);
-            loaderService.LoadMap(mapName);
             simController.OnMapLoaded();
         }
     }

@@ -23,6 +23,19 @@ namespace OHTSim.Visualization3D
         static readonly int _colorId    = Shader.PropertyToID("_BaseColor");
         static readonly int _emissionId = Shader.PropertyToID("_EmissionColor");
 
+        private float _targetCongestion = 0f;
+        private float _currentCongestion = 0f;
+        private float _smoothSpeed = 4.0f; // Smooth transition speed
+
+        private void Update()
+        {
+            if (!Mathf.Approximately(_currentCongestion, _targetCongestion))
+            {
+                _currentCongestion = Mathf.Lerp(_currentCongestion, _targetCongestion, Time.deltaTime * _smoothSpeed);
+                ApplyCongestionColors(_currentCongestion);
+            }
+        }
+
         /// <summary>
         /// 양 끝 좌표를 받아 노드 반경만큼 잘라낸 후 정중앙에 배치, Z축이 진행 방향이 되도록 회전.
         /// </summary>
@@ -60,22 +73,41 @@ namespace OHTSim.Visualization3D
         {
             _congestionRenderer = overlayRenderer;
             if (_congestionRenderer != null)
+            {
                 _congestionMaterial = _congestionRenderer.material; // 인스턴스 머티리얼
+                // Initialize congestion colors
+                ApplyCongestionColors(0f);
+            }
         }
 
-        /// <summary>혼잡도(0~1)에 따라 오버레이 색/발광을 보간한다. 0=투명한 어두운 파랑, 1=네온 빨강.</summary>
+        /// <summary>혼잡도(0~1) 목표값을 설정하고, Update에서 부드럽게 색상이 변경되도록 합니다.</summary>
         public void SetCongestion(float t01)
+        {
+            _targetCongestion = Mathf.Clamp01(t01);
+        }
+
+        private void ApplyCongestionColors(float t01)
         {
             if (_congestionRenderer == null || _congestionMaterial == null) return;
 
-            t01 = Mathf.Clamp01(t01);
-            Color low  = new Color(0.1f, 0.2f, 0.6f);   // 저혼잡: 어두운 파랑
-            Color high = new Color(1f,   0.1f, 0.05f);  // 고혼잡: 네온 빨강
-            Color baseCol = Color.Lerp(low, high, t01);
+            // SF 스타일 네온 그라데이션: 사이언/블루 (저혼잡) -> 퍼플 (중혼잡) -> 네온 오렌지/레드 (고혼잡)
+            Color low  = new Color(0.0f, 0.65f, 1.0f);  // Cyber Cyan Blue
+            Color mid  = new Color(0.6f, 0.1f, 0.95f);  // Hyper Purple
+            Color high = new Color(1.0f, 0.15f, 0.05f); // Overload Neon Red
+
+            Color baseCol;
+            if (t01 < 0.5f)
+            {
+                baseCol = Color.Lerp(low, mid, t01 * 2.0f);
+            }
+            else
+            {
+                baseCol = Color.Lerp(mid, high, (t01 - 0.5f) * 2.0f);
+            }
 
             _congestionMaterial.SetColor(_colorId, baseCol);
-            // 미니맵 블룸용 HDR 발광
-            _congestionMaterial.SetColor(_emissionId, baseCol * (0.5f + t01 * 2.5f));
+            // 미니맵 블룸용 HDR 고광량 발광 (최대 4.0배)
+            _congestionMaterial.SetColor(_emissionId, baseCol * (0.8f + t01 * 3.2f));
         }
     }
 }

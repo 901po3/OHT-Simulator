@@ -81,11 +81,11 @@ namespace OHTSim.Visualization3D
         public NodeView GetNodeView(string nodeId)
             => _nodeViews.TryGetValue(nodeId, out var v) ? v : null;
 
-        /// <summary>월드 좌표 변환 — VisualizationConfig의 scale + separationMultiplier 적용.</summary>
+        /// <summary>월드 좌표 변환 — VisualizationConfig의 scale + separationMultiplier 적용 (천장 레일 높이인 Y=5.5f로 상향 조정).</summary>
         public Vector3 ToWorld(MapNode node)
             => new Vector3(
                 node.x * config.mapScale * config.nodeSeparationMultiplier,
-                0f,
+                5.5f,
                 -node.y * config.mapScale * config.nodeSeparationMultiplier
             );
 
@@ -102,6 +102,16 @@ namespace OHTSim.Visualization3D
         {
             var prefab = prefabRegistry.GetPrefab(node.type);
             GameObject go;
+            
+            Vector3 worldPos = ToWorld(node); // Y=5.5f
+            Vector3 spawnPos = worldPos;
+
+            // 라우팅용 노드(Normal)는 천장(Y=5.5f)에 그대로 두고, 제조 장비 노드는 바닥(Y=0f)에 배치합니다.
+            if (node.type != NodeType.Normal)
+            {
+                spawnPos.y = 0f;
+            }
+
             if (prefab != null)
             {
                 go = Instantiate(prefab, _nodesRoot);
@@ -113,14 +123,14 @@ namespace OHTSim.Visualization3D
                 go.transform.localScale = Vector3.one * 1.5f;
             }
 
-            Vector3 worldPos = ToWorld(node);
-            go.transform.position = worldPos;
+            go.transform.position = spawnPos;
 
             var entry = prefabRegistry.Get(node.type);
             if (entry != null)
                 go.transform.rotation *= Quaternion.Euler(entry.rotationOffset);
 
             var view = go.GetComponent<NodeView>() ?? go.AddComponent<NodeView>();
+            // NodeView는 레일/로봇 이동 기준이 되는 천장 좌표(Y=5.5f)를 월드 좌표로 바인딩합니다.
             view.Bind(node, worldPos);
 
             _nodeViews[node.id] = view;
