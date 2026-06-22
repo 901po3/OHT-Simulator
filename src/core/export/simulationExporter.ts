@@ -111,14 +111,18 @@ export function generateSimulationXML(
   });
 
   // 엣지 변환
-  const exportEdges: ExportEdge[] = edges.map((e, idx) => ({
-    id: e.id || `edge_${idx}`,
-    fromNodeId: (typeof e.from === 'string' ? e.from : e.fromId) as string,
-    toNodeId: (typeof e.to === 'string' ? e.to : e.toId) as string,
-    direction: 'Forward',
-    cost: 1,
-    isOneWay: true,
-  }));
+  const exportEdges: ExportEdge[] = edges.map((e, idx) => {
+    const fromNodeId = typeof e.from === 'string' ? e.from : (typeof e.fromId === 'string' ? e.fromId : String(e.fromId));
+    const toNodeId = typeof e.to === 'string' ? e.to : (typeof e.toId === 'string' ? e.toId : String(e.toId));
+    return {
+      id: e.id || `edge_${idx}`,
+      fromNodeId,
+      toNodeId,
+      direction: 'Forward',
+      cost: 1,
+      isOneWay: true,
+    };
+  });
 
   // 공정 스테이션 집계
   const stationsByType = new Map<string, { nodeIds: Set<string>; positions: Array<{ x: number; y: number }> }>();

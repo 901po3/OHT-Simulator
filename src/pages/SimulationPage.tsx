@@ -108,8 +108,8 @@ export function SimulationPage() {
   }, []);
 
   const handleExportSimulation = async () => {
-    const { generateSimulationXML } = await import('../core/export/simulationExporter');
-    const xml = generateSimulationXML(
+    const simulationExporter = await import('../core/export/simulationExporter');
+    const xml = simulationExporter.generateSimulationXML(
       [...nodes.values?.() ?? nodes],
       edges,
       efficiency?.optimalRobotCount ?? agentCount,
