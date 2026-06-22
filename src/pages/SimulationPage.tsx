@@ -60,6 +60,8 @@ export function SimulationPage() {
 
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleWarning, setVisibleWarning] = useState<string | null>(null);
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const obs = new ResizeObserver(entries => {
@@ -69,6 +71,20 @@ export function SimulationPage() {
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
   }, []);
+
+  // 경고 메시지 유지: 새 경고가 들어오면 3초 이상 표시 후 사라짐
+  useEffect(() => {
+    if (overcrowdWarning) {
+      setVisibleWarning(overcrowdWarning);
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = setTimeout(() => {
+        setVisibleWarning(null);
+      }, 3000); // 3초 유지
+    }
+    return () => {
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    };
+  }, [overcrowdWarning]);
 
   useEffect(() => {
     if (!running) { lastTRef.current = null; return; }
@@ -132,25 +148,25 @@ export function SimulationPage() {
       )}
 
       {/* ── 과잉 투입 경고 배너 ──
-          항상 DOM에 존재하며 max-height 트랜지션으로 부드럽게 슬라이드.
-          조건부 렌더링은 아래 컨트롤 바·맵 영역의 레이아웃 시프트(어지러움)를 유발했다. */}
+          min-height: 36px로 고정 → 화면이 밀리지 않음
+          visibleWarning 상태로 3초 이상 유지 → 메시지 안 팍 사라짐 */}
       <div
         aria-live="polite"
         style={{
-          background: '#d297001a',
-          borderBottom: overcrowdWarning ? '1px solid #d2970066' : '1px solid transparent',
+          background: visibleWarning ? '#d297001a' : 'transparent',
+          borderBottom: visibleWarning ? '1px solid #d2970066' : '1px solid transparent',
           color: '#d29700', fontSize: 11,
-          maxHeight: overcrowdWarning ? 36 : 0,
-          opacity:   overcrowdWarning ? 1 : 0,
-          padding: overcrowdWarning ? '6px 14px' : '0 14px',
+          minHeight: 36,  // 항상 36px 높이 유지 (화면 밀림 방지)
+          opacity: visibleWarning ? 1 : 0,
+          padding: '6px 14px',
           overflow: 'hidden',
-          transition: 'max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease',
+          transition: 'opacity 0.3s ease, background 0.3s ease, border-color 0.3s ease',
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-          pointerEvents: overcrowdWarning ? 'auto' : 'none',
+          pointerEvents: visibleWarning ? 'auto' : 'none',
         }}
       >
-        <span style={{ fontSize: 14 }}>⚠</span>
-        <span>{overcrowdWarning ?? ''}</span>
+        <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
+        <span>{visibleWarning ?? ''}</span>
       </div>
 
       {/* ── 상단 컨트롤 바 ── */}
