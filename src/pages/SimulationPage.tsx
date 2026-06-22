@@ -107,8 +107,8 @@ export function SimulationPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleExportSimulation = () => {
-    const { generateSimulationXML } = require('../core/export/simulationExporter');
+  const handleExportSimulation = async () => {
+    const { generateSimulationXML } = await import('../core/export/simulationExporter');
     const xml = generateSimulationXML(
       [...nodes.values?.() ?? nodes],
       edges,

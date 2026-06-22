@@ -1,5 +1,3 @@
-import { RailNode, RailEdge } from '../graph/types';
-
 /**
  * Unity 3D 시뮬레이션용 최종 시뮬레이션 데이터를 XML로 내보냄
  * C# Serializable 구조와 매칭되는 깔끔한 계층 구조
@@ -68,8 +66,8 @@ interface OptimizationHints {
 }
 
 export function generateSimulationXML(
-  nodes: RailNode[],
-  edges: RailEdge[],
+  nodes: any[],
+  edges: any[],
   optimalRobotCount: number,
   avgMoveDistance: number,
   congestionLevel: number,
@@ -114,9 +112,9 @@ export function generateSimulationXML(
 
   // 엣지 변환
   const exportEdges: ExportEdge[] = edges.map((e, idx) => ({
-    id: `edge_${idx}`,
-    fromNodeId: e.from,
-    toNodeId: e.to,
+    id: e.id || `edge_${idx}`,
+    fromNodeId: (typeof e.from === 'string' ? e.from : e.fromId) as string,
+    toNodeId: (typeof e.to === 'string' ? e.to : e.toId) as string,
     direction: 'Forward',
     cost: 1,
     isOneWay: true,

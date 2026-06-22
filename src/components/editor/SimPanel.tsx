@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSimRunStore } from '../../store/simRunStore';
 import { useEditorStore } from '../../store/editorStore';
-import { ALGORITHM_META, ALGORITHM_ORDER, type AlgorithmId } from '../../core/pathfinding/algorithms';
+import { ALGORITHM_META, ALGORITHM_ORDER } from '../../core/pathfinding/algorithms';
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   recommended: { label: '권장', color: '#3fb950' },

@@ -50,13 +50,14 @@ const divider: React.CSSProperties = {
 type MapData = { nodes: import('../../store/editorStore').EditorNode[]; edges: import('../../store/editorStore').EditorEdge[] };
 type NT = import('../../store/editorStore').NodeType;
 
-function makeMapBuilder() {
-  let nSeq = 1; let eSeq = 1;
-  const n = (type: NT, x: number, y: number) => ({ id: `node-${nSeq++}`, type, x, y });
-  const bi = (aId: string, bId: string) =>
-    [{ id: `edge-${eSeq++}`, fromId: aId, toId: bId }, { id: `edge-${eSeq++}`, fromId: bId, toId: aId }];
-  return { n, bi };
-}
+// Utility for future use
+// function makeMapBuilder() {
+//   let nSeq = 1; let eSeq = 1;
+//   const n = (type: NT, x: number, y: number) => ({ id: `node-${nSeq++}`, type, x, y });
+//   const bi = (aId: string, bId: string) =>
+//     [{ id: `edge-${eSeq++}`, fromId: aId, toId: bId }, { id: `edge-${eSeq++}`, fromId: bId, toId: aId }];
+//   return { n, bi };
+// }
 
 // ───────────────────────────────────────────────────────────────────
 // 단방향 그리드 공용 빌더 — 4가지 설계 원칙을 모든 프리셋에 일관 적용
