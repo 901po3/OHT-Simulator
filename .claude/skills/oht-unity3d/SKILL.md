@@ -72,6 +72,22 @@ description: OHT-System Unity 3D Visualization 레이어 작업 가이드. Use w
 - 노드 위치가 너무 가까우면 → `VisualizationConfig.nodeSeparationMultiplier` ↑
 - 카메라가 너무 멀면 → `ThirdPersonCameraRig.CenterOnMap()`이 `WorldBounds` 잘 계산했는지
 
+## 알고리즘 명명 매핑 (혼동 방지)
+
+문서/코드 위치마다 표기가 달라 혼란을 줄 수 있다. 매핑을 명시한다:
+
+| 개념 | 웹 TS (`algorithms.ts`) | Unity C# (`PathfindingBridge.cs`) | 문서/UI 표기 |
+|------|------------------------|----------------------------------|--------------|
+| Standard A* | `'astar'` | `AlgorithmId.Standard` | "Standard A*" |
+| Dijkstra | `'dijkstra'` | `AlgorithmId.Dijkstra` | "Dijkstra" |
+| Greedy BFS | `'greedy'` | `AlgorithmId.Greedy` | "Greedy BFS" |
+| Stochastic A* | `'stochastic'` | `AlgorithmId.Stochastic` | "Stochastic A*" |
+| Priority A* (혼잡 가중치) | `'priority'` | `AlgorithmId.Priority` | "Priority A*" — **기본 채택** |
+| 예약 테이블 ×8 페널티 | `'cbs'` | `AlgorithmId.CbsLite` | "CBS-Lite" 또는 "WHCA*" — **동일 알고리즘** |
+
+**중요**: `WHCA*`와 `CBS-Lite`는 이 프로젝트 내에서 **동일한 메커니즘**(시공간 예약 테이블 + ×8 페널티)을
+가리키는 두 이름이다. PathfindingBridge에는 `CbsLite` 메서드 단 하나만 존재.
+
 ## 관련 문서
 
 - 셋업: `docs/unity/Visualization3D_Setup.md`

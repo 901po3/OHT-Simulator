@@ -38,7 +38,7 @@
 | S-05 | 자동 최적화 출하 (autoDispatch) 토글 | ✅ | true=최근접, false=고정 순환 |
 | S-06 | 공정 사이클 (Deposition→Exposure→Etching→Cleaning→반복) | ✅ | processStage 0-3 |
 | S-07 | 차고지(Depot) 자동 스폰 (1초 간격, 점유 시 대기) | ✅ | spawnTimers Map |
-| S-08 | Processing 상태 (1.5초) 후 다음 공정으로 이동 | ✅ | |
+| S-08 | Processing 상태 (노드 타입별 1.0~1.8초: Deposition 1.5 / Exposure 1.2 / Etching 1.8 / Cleaning 1.0) 후 다음 공정으로 이동 | ✅ | |
 | S-09 | 충돌 방지 (occupied Map, 다음 노드 점유 시 대기) | ✅ | |
 | S-10 | 혼잡도 히트맵 오버레이 | ✅ | |
 | S-11 | 경로 미리보기 (점선 Arrow) | ✅ | |
@@ -94,17 +94,19 @@
 
 ---
 
-## 7. Unity 작업 (HandoffToUnity.md 참조)
+## 7. Unity 작업 (HandoffToUnity.md / Visualization3D_Setup.md 참조)
 
-| # | 기능 | 상태 | 담당 |
+| # | 기능 | 상태 | 비고 |
 |---|------|------|------|
-| U-01 | CameraOverlayUI (탑뷰/로봇 시점) 배치 | ⏳ | UnityAI (HandoffToUnity A항목) |
-| U-02 | StatsDashboardUI (통계 대시보드) 배치 | ⏳ | UnityAI (HandoffToUnity A항목) |
-| U-03 | ViewControl 탭 (뷰 제어) | ⏳ | UnityAI (HandoffToUnity B항목) |
-| U-04 | 건설 모드 (ConstructionModeManager) | ⏳ | UnityAI (HandoffToUnity C항목) |
-| U-05 | 맵 파일 선택 다이얼로그 (플레이 모드 진입 시) | ⏳ | UnityAI (HandoffToUnity E-1) |
-| U-06 | 선택된 맵 3D 렌더링 (MapLoaderService + MapBuilder) | ⏳ | UnityAI (HandoffToUnity E-2) |
-| U-07 | 상단 큰 "시뮬레이션 시작" 버튼 → SimulationController.StartSimulation() | ⏳ | UnityAI (HandoffToUnity E-3) |
+| U-01 | ThirdPersonCameraRig (3인칭 시점) + 미니맵 카메라 | ✅ | `Visualization3D/Camera/`, `Visualization3D/Minimap/` |
+| U-02 | SimOverlayUI (통계 대시보드) | ✅ | `UI/SimOverlayUI.cs` |
+| U-03 | CameraModeController + MinimapRenderer (3인칭 ↔ 풀스크린 토뷰 전환) | ✅ | 미니맵 클릭 또는 ESC |
+| U-04 | 런타임 컨트롤 (로봇 수·속도 슬라이더) | ✅ | `RuntimeControlsUI.cs` — 건설 모드 대신 동적 시뮬 제어 |
+| U-05 | 맵 파일 선택 UI (플레이 모드 진입 시) | ✅ | `UI/MapSelectorUI.cs` — StreamingAssets/Maps 스캔 |
+| U-06 | 선택된 맵 3D 렌더링 (Map3DBuilder + FactoryEnvironmentBuilder) | ✅ | 노드 프리팹·긴 레일·공장 환경 자동 생성 |
+| U-07 | 시뮬레이션 시작 — AutoStartOnMapReady 자동 시작 (또는 StartSimButtonUI 수동) | ✅ | 둘 다 OnMapReady 구독, 양립 가능 |
+| U-08 | 런타임 로봇 풀 + 속도 배율 | ✅ | `RobotFleetController` + `GameServices.SpeedMultiplier` |
+| U-09 | 씬·프리팹 에디터 셋업 (SO 2종 + 노드 6종 + 로봇·레일 프리팹) | ⏳ | Unity AI 작업 — `Visualization3D_Setup.md` 참조 |
 
 ---
 

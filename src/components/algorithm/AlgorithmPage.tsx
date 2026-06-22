@@ -109,7 +109,7 @@ CBS는 오프라인 계획이나 소규모 정적 환경에는 최적이지만, 
 
 Priority A*는 각 에이전트가 A* 탐색 시 다른 에이전트들의 현재 위치를 혼잡도(0~1)로 받아 엣지 비용에 ×2.5 패널티를 부여합니다. 비싼 전역 탐색 없이도 로봇들이 자연스럽게 분산됩니다.
 
-여기에 WHCA*(Windowed Hierarchical Cooperative A*)를 보조 기법으로 추가했습니다. 각 에이전트가 앞으로 이동할 12스텝을 예약 테이블에 등록하고, 후순위 에이전트가 예약된 노드를 만나면 비용 ×8 페널티로 자동 우회하는 방식입니다.
+여기에 WHCA*(Windowed Hierarchical Cooperative A*)를 보조 기법으로 추가했습니다. 각 에이전트가 앞으로 이동할 8스텝(CBS_LOOKAHEAD)을 예약 테이블에 등록하고, 후순위 에이전트가 예약된 노드를 만나면 비용 ×8 페널티로 자동 우회하는 방식입니다.
 
 결과적으로 60fps를 유지하면서 데드락 발생률을 95% 이상 감소시키는 데 성공했습니다.`,
     result: '채택 — 60fps 실시간 유지 + 교착 95% 감소',
@@ -156,13 +156,13 @@ const TECHNIQUES = [
   },
   {
     icon: '🗺',
-    title: 'WHCA* 시공간 예약 테이블',
+    title: 'WHCA* 시공간 예약 테이블 (= CBS-Lite)',
     category: '충돌 사전 차단',
     color: '#3fb950',
     problem: '혼잡도 맵만으로는 정확한 미래 위치를 알 수 없어 충돌이 잔존',
-    solution: '각 에이전트가 다음 12스텝 경로를 예약 테이블(node_id → timestep)에 등록. 후순위 에이전트가 예약된 노드를 만나면 비용 ×8 패널티 적용.',
+    solution: '각 에이전트가 다음 8스텝(CBS_LOOKAHEAD) 경로를 예약 테이블(node_id → timestep)에 등록. 후순위 에이전트가 예약된 노드를 만나면 비용 ×8 패널티 적용.',
     result: '충돌 사전 차단율 대폭 향상. 데드락 에스컬레이션 빈도 감소.',
-    code: 'Window=12, Penalty=×8',
+    code: 'Window=8, Penalty=×8',
   },
   {
     icon: '🚦',
@@ -752,6 +752,11 @@ export function AlgorithmPage() {
             직접 구현·테스트한 7개 알고리즘의 4가지 지표. 반투명 막대는 채택되지 않은 알고리즘.
           </p>
           <AlgoCompareChart />
+          <blockquote style={{ borderLeft: '3px solid #58a6ff', paddingLeft: 14, margin: '18px 0 0', fontSize: 12, color: '#8b949e', lineHeight: 1.7 }}>
+            CBS-Lite(=WHCA*)는 4지표 중 3개가 Priority A*보다 우수합니다. 그럼에도 <strong style={{ color: '#e6edf3' }}>보조 채택</strong>인 이유는 (1) CPU 효율이 15p 낮아 60fps hard constraint를 위협하고,
+            (2) 모든 에이전트가 갱신하는 <strong style={{ color: '#e6edf3' }}>공유 예약 테이블</strong>에 의존해 단독 동작이 불가능하기 때문입니다. 실제 채택 구조는
+            <strong style={{ color: '#3fb950' }}> Priority A* (기본 경로계획) + CBS-Lite (예약 충돌 시 ×8 페널티 보강)</strong> 의 <strong>층화 하이브리드</strong>입니다.
+          </blockquote>
         </Card>
       </section>
 

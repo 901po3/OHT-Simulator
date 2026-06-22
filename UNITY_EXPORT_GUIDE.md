@@ -34,7 +34,9 @@ Unity C# 역직렬화 (OHTSimulationData.cs + OHTSimulationLoader)
 ### 3️⃣ XML 내보내기
 - 우측 상단 **💾 XML 내보내기** 버튼 클릭
 - `oht-simulation-YYYY-MM-DD.xml` 파일 다운로드
-- 파일을 Unity 프로젝트의 `Assets/Resources/OHT/` 폴더에 저장
+- 파일을 Unity 프로젝트의 `Assets/StreamingAssets/Maps/` 폴더에 저장
+  - (`MapLoaderService`가 `Application.streamingAssetsPath/Maps/`에서 XML 목록을 스캔)
+  - 폴더가 없으면 생성하세요. Resources 폴더가 아닙니다 — Resources는 Unity 빌드 시 압축돼 외부 파일 추가가 불가능합니다.
 
 ---
 
@@ -325,7 +327,7 @@ public class RobotStateUpdate
 
 ## ✅ 체크리스트
 
-- [ ] XML 파일이 `Assets/Resources/OHT/` 폴더에 있음
+- [ ] XML 파일이 `Assets/StreamingAssets/Maps/` 폴더에 있음
 - [ ] `OHTSimulationData.cs`가 프로젝트에 포함됨
 - [ ] `OHTSimulationManager` 스크립트가 씬에 있음
 - [ ] 노드/엣지/스테이션이 3D에 정상 렌더링됨

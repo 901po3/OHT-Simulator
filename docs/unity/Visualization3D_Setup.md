@@ -12,7 +12,7 @@
 
 | # | 작업 | 결과물 | 비고 |
 |---|------|--------|------|
-| 1 | ScriptableObject 2종 생성 | `VisualizationConfig.asset`, `NodePrefabRegistry.asset` | Assets/Resources/OHT3D/ |
+| 1 | ScriptableObject 2종 생성 | `VisualizationConfig.asset`, `NodePrefabRegistry.asset` | Assets/Resources/OHT/ |
 | 2 | 로우폴리 노드 프리팹 6종 제작 | Normal/Deposition/Exposure/Etching/Cleaning/Depot | Assets/Prefabs/Nodes/ |
 | 3 | 레일 세그먼트 프리팹 | RailSegment.prefab (Cube + 머티리얼) | Assets/Prefabs/ |
 | 4 | 로봇 프리팹 | Robot.prefab (로우폴리 OHT) | Assets/Prefabs/ |
@@ -23,10 +23,15 @@
 
 ## 📦 1. ScriptableObject 생성
 
+> **사전 작업**: 다음 폴더들이 없으면 Project 창에서 미리 생성하세요.
+> - `Assets/Resources/OHT/`
+> - `Assets/Prefabs/Nodes/`
+> - `Assets/StreamingAssets/Maps/` (웹에서 내보낸 XML 보관용)
+
 ### 1-A. VisualizationConfig
 1. Project 창 > 우클릭 > `Create > OHT > Visualization Config`
 2. 파일명: `VisualizationConfig.asset`
-3. 위치: `Assets/Resources/OHT3D/`
+3. 위치: `Assets/Resources/OHT/`
 4. 권장 초기값 (인스펙터):
    ```
    Map Scale: 0.05
@@ -127,7 +132,9 @@
            ├─ SpeedLabel
            └─ ModeLabel
 
-* StartSimButton 제거됨 — AutoStartOnMapReady가 맵 로드 직후 자동 시작.
+* `StartSimButtonUI`는 코드상 여전히 존재하며 AutoStartOnMapReady와 양립 가능
+  (둘 다 OnMapReady 구독). 자동 시작 흐름에서는 버튼 GameObject를 씬에 배치하지 않거나
+  비활성화하여 사용하지 않는다.
 ```
 
 ### 5-B. Bootstrapper 인스펙터 필드 주입
