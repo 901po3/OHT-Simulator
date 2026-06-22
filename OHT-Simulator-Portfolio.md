@@ -4,7 +4,7 @@
 
 - **이름**: 권혁인 (Hyukin Kwon)
 - **GitHub**: https://github.com/901po3/OHT-Simulator
-- **라이브 데모**: https://oht-simulator-by-hyukin.vercel.app <span style="color:#888;font-size:0.8em">(모바일, PC 지원 - PC 권장)</span>
+- **라이브 데모**: https://oht-simulator-by-hyukin.vercel.app <span style="color:#888;font-size:0.8em">(PC 권장 - 모바일 전용 뷰 지원)</span>
 - **관심사**: 스마트팩토리, OHT 시스템, 디지털 트윈
 
 ---
