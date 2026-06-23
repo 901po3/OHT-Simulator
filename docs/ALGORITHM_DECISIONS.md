@@ -1,8 +1,10 @@
 # 경로탐색 알고리즘 설계 결정 과정
 
 > OHT 시뮬레이터의 핵심 도전: **100대 로봇 무한 운행 중 교착 제거**
-> 최종 선택: **Priority A* (기본) + WHCA*(CBS-Lite) (보조) 하이브리드**
-> 비교한 알고리즘은 모두 7종: Standard A*, Dijkstra, Greedy BFS, Stochastic A*, CBS Full, Priority A*, CBS-Lite(WHCA*).
+> 최종 선택: **Priority A* (기본) + WHCA* (보조) 하이브리드**
+> 비교한 알고리즘은 모두 7종: Standard A*, Dijkstra, Greedy BFS, Stochastic A*, CBS Full, Priority A*, WHCA*.
+>
+> 📌 **용어 정정 (제출 후 자기 검토):** 코드에서 `CBS-Lite`로 명명한 보조 알고리즘은, 시공간 예약 테이블의 노드를 높은 비용으로 회피하는 단일 패스 A* 근사입니다. CBS의 고수준 충돌 트리가 없으므로 엄밀히는 CBS가 아니라 **WHCA*(Windowed Hierarchical Cooperative A*) 계열**이며, MAPF 문헌을 재검토해 용어를 바로잡았습니다.
 
 ---
 
@@ -55,7 +57,7 @@ function astar(start, goal, grid, heuristic = manhattan):
 
 ---
 
-### **Round 2: WHCA* / CBS-Lite (시공간 예약 테이블)**
+### **Round 2: WHCA* (시공간 예약 테이블, 코드명 `CBS-Lite`)**
 
 **핵심 개념: "시공간" 이란?**
 
@@ -111,10 +113,10 @@ if (upcomingNode is occupied):
 
 ---
 
-### **Round 3: Priority A* + WHCA*(CBS-Lite) 하이브리드 ✅ (최종 선택)**
+### **Round 3: Priority A* + WHCA* 하이브리드 ✅ (최종 선택)**
 
 **인사이트:**
-- CBS-Lite/WHCA*는 **모든 로봇에게** 12스텝 예약을 강요
+- WHCA*는 **모든 로봇에게** 12스텝 예약을 강요
 - 실제로는 **교착 위험이 높은 순간에만** 필요
 - 아이디어: 혼잡도 기반 동적 전환
 - 추가 안정화: PathCommitmentSteps = 5 (매 틱 재계산이 아닌 5스텝 이동 후에만 재탐색), OpenList를 BinaryHeap&lt;Node&gt;로 교체해 O(log V)
@@ -300,6 +302,6 @@ public static List<int> PriorityAstar(
 | Stochastic A* | `'stochastic'` | `AlgorithmId.Stochastic` | "Stochastic A*" |
 | CBS Full | `'cbsFull'` | `AlgorithmId.CbsFull` | "CBS Full" (오프라인/소규모 전용) |
 | **Priority A*** | `'priority'` | `AlgorithmId.Priority` | "Priority A*" ✅ |
-| **CBS-Lite / WHCA*** | `'cbs'` | `AlgorithmId.CbsLite` | "CBS-Lite" / "WHCA*" (동일 메커니즘) |
+| **WHCA*** (코드명 `CBS-Lite`) | `'cbs'` | `AlgorithmId.CbsLite` | "WHCA*" ✅ |
 
-> 주의: "WHCA*"와 "CBS-Lite"는 이 프로젝트에서 동일한 메커니즘을 가리킴
+> 주의: 코드 식별자는 `cbs` / `CbsLite`이지만, 그 구현은 **WHCA\*** (예약 테이블 기반 단일 패스 A* 근사)입니다. 고수준 충돌 트리가 있는 **CBS와는 다른 알고리즘**이며, 상단 § 용어 정정을 참고하세요.

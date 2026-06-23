@@ -32,7 +32,7 @@
 | # | 기능 | 상태 | 비고 |
 |---|------|------|------|
 | S-01 | 풀스크린 맵 + 에이전트 오버레이 (SimMapCanvas) | ✅ | 읽기 전용 맵, pan/zoom |
-| S-02 | 7종 알고리즘 선택 (Standard A* / Dijkstra / Greedy BFS / Stochastic A* / CBS Full / Priority A* / CBS-Lite(WHCA*)) | ✅ | 상단 컨트롤 바 |
+| S-02 | 7종 알고리즘 선택 (Standard A* / Dijkstra / Greedy BFS / Stochastic A* / CBS Full / Priority A* / WHCA*) | ✅ | 상단 컨트롤 바 |
 | S-03 | 로봇 수 슬라이더 (1–12) | ✅ | |
 | S-04 | 속도 슬라이더 | ✅ | |
 | S-05 | 자동 최적화 출하 (autoDispatch) 토글 | ✅ | true=최근접, false=고정 순환 |
@@ -88,7 +88,7 @@
 | # | 기능 | 상태 | 비고 |
 |---|------|------|------|
 | I-01 | TypeScript 알고리즘 (웹 데모용) | ✅ | `src/core/pathfinding/algorithms.ts` |
-| I-02 | Unity C# 알고리즘 (7종: Standard A* / Dijkstra / Greedy BFS / Stochastic A* / CBS Full / Priority A* / CBS-Lite(WHCA*)) | ✅ | Assets/Scripts/Core/Pathfinding/ |
+| I-02 | Unity C# 알고리즘 (7종: Standard A* / Dijkstra / Greedy BFS / Stochastic A* / CBS Full / Priority A* / WHCA*) | ✅ | Assets/Scripts/Core/Pathfinding/ |
 | I-03 | TS ↔ C# 직접 코드 통합 | ❌ | 브라우저/Unity 런타임 환경 차이로 불가. 문서화로 알고리즘적 동일성 보장 |
 | I-04 | 알고리즘 대응 문서 (`AlgorithmMapping.md`) | ⏳ | 작성 예정 |
 
