@@ -9,6 +9,8 @@
 🎬 **데모 영상**: <https://www.youtube.com/watch?v=MgcAas0tiJc> (맵 에디팅 → 시뮬레이션 → XML 추출 → Unity 실행)  
 🌐 **라이브 데모**: <https://oht-simulator-by-hyukin.vercel.app>
 
+> **📌 제출본(PDF) 이후 자기 검토 보완** — 이 저장소와 라이브 데모는 포트폴리오 PDF 제출 이후 자기 검토를 거쳐 다음을 보완했습니다: ① 용어 정정(`CBS-Lite` → **WHCA\***, CBS와 다른 알고리즘) ② 인과 명료화(작업 배정은 처리량을, 하이브리드 + 데드락 에스컬레이션은 교착을 담당) ③ 한계 명시(로봇 이동은 등속 `Lerp` 보간 — 물리 가감속 미적용). **PDF와 차이가 있다면 본 저장소가 최신이며 더 정확합니다.**
+
 **100대 로봇 무한 운행 OHT 시뮬레이터**
 
 반도체 팹 OHT(Overhead Hoist Transport) 시뮬레이터 포트폴리오.  

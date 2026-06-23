@@ -764,7 +764,7 @@ export function AlgorithmPage() {
       <section>
         <Card>
           <p style={{ fontSize: 12, color: '#8b949e', lineHeight: 1.75, margin: 0 }}>
-            📌 <strong style={{ color: '#f0b72f' }}>용어 정정 (제출 후 자기 검토)</strong> — 코드·문서에서 <code style={{ color: '#79c0ff' }}>CBS-Lite</code>로 명명한 충돌 회피 방식은, 시공간 예약 테이블의 노드를 높은 비용(×8)으로 회피하는 <strong style={{ color: '#e6edf3' }}>단일 패스 A* 근사</strong>입니다. CBS(Conflict-Based Search)의 고수준 충돌 트리가 없으므로, 엄밀히는 CBS가 아니라 <strong style={{ color: '#e6edf3' }}>WHCA*(Windowed Hierarchical Cooperative A*) 계열</strong>입니다. MAPF(다중 에이전트 경로탐색) 문헌을 재검토해 용어를 바로잡았습니다.
+            📌 <strong style={{ color: '#f0b72f' }}>용어 정정 (제출 후 자기 검토)</strong> — 코드·문서에서 <code style={{ color: '#79c0ff' }}>CBS-Lite</code>로 명명한 충돌 회피 방식은, 시공간 예약 테이블의 노드를 높은 비용(×8)으로 회피하는 <strong style={{ color: '#e6edf3' }}>단일 패스 A* 근사</strong>입니다. CBS(Conflict-Based Search)의 고수준 충돌 트리가 없으므로, 엄밀히는 CBS가 아니라 <strong style={{ color: '#e6edf3' }}>WHCA*(Windowed Hierarchical Cooperative A*) 계열</strong>입니다. MAPF(다중 에이전트 경로탐색) 문헌을 재검토해 용어를 바로잡았습니다. <strong style={{ color: '#e6edf3' }}>제출한 PDF와 차이가 있다면, 본 페이지·저장소가 자기 검토를 거친 최신 버전이며 더 정확합니다.</strong>
           </p>
         </Card>
       </section>
