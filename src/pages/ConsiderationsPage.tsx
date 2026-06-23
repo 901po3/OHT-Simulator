@@ -48,8 +48,8 @@ export function ConsiderationsPage() {
               },
               {
                 title: '가속도 & 감속 모델',
-                current: '순간 가속 (상수 속도)',
-                reality: 'OHT는 선로에서 모터·풀리·중력에 의해 제약된 가속도를 가짐. 특히 수직 이동(elevators) 구간에서 비선형.',
+                current: 'Vector3.Lerp 시각 보간 기반 등속 — 물리 가속도 미적용',
+                reality: 'OHT는 선로에서 모터·풀리·중력에 의해 제약된 가속도를 가짐. 특히 수직 이동(elevators) 구간에서 비선형. 가속도/감속도 역학과 비상정지(E-Stop)는 향후 고도화 과제.',
                 impact: 'MEDIUM',
                 ref: 'Spiliotis et al. (2007) "A Continuous Time Bayesian Network for Diagnosing Mass Functions in Public Transport Networks"',
               },

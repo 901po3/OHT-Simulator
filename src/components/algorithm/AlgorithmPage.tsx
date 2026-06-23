@@ -760,6 +760,15 @@ export function AlgorithmPage() {
         </Card>
       </section>
 
+      {/* § 용어 정정 노트 */}
+      <section>
+        <Card>
+          <p style={{ fontSize: 12, color: '#8b949e', lineHeight: 1.75, margin: 0 }}>
+            📌 <strong style={{ color: '#f0b72f' }}>용어 정정 (제출 후 자기 검토)</strong> — 코드·문서에서 <code style={{ color: '#79c0ff' }}>CBS-Lite</code>로 명명한 충돌 회피 방식은, 시공간 예약 테이블의 노드를 높은 비용(×8)으로 회피하는 <strong style={{ color: '#e6edf3' }}>단일 패스 A* 근사</strong>입니다. CBS(Conflict-Based Search)의 고수준 충돌 트리가 없으므로, 엄밀히는 CBS가 아니라 <strong style={{ color: '#e6edf3' }}>WHCA*(Windowed Hierarchical Cooperative A*) 계열</strong>입니다. MAPF(다중 에이전트 경로탐색) 문헌을 재검토해 용어를 바로잡았습니다.
+          </p>
+        </Card>
+      </section>
+
       {/* § 의외의 발견 — 시스템이 알고리즘을 압도한다 */}
       <section>
         <SectionTitle>💡 의외의 발견 — 시스템이 알고리즘을 압도한다</SectionTitle>
@@ -770,6 +779,7 @@ export function AlgorithmPage() {
           </p>
           <ul style={{ fontSize: 12, color: '#8b949e', lineHeight: 1.9, paddingLeft: 18, marginBottom: 14 }}>
             <li>목표 자동 분산 + <strong style={{ color: '#79c0ff' }}>공유 혼잡도 맵</strong> 덕분에 모든 알고리즘이 동일한 비용 신호를 받아, 휴리스틱 차이가 평탄화됩니다.</li>
+            <li><strong style={{ color: '#f0b72f' }}>처리량 ≠ 무충돌</strong> — 위 결과는 <strong style={{ color: '#e6edf3' }}>전체 작업 처리 속도</strong> 얘기입니다. 하지만 교차로나 좁은 길목에서 <strong style={{ color: '#e6edf3' }}>로봇 둘이 같은 칸에 동시에 들어가려다 막혀 멈추는 교착</strong>은 작업 배정만으로는 안 풀립니다. 이건 Priority A* + WHCA*가 미리 길을 예약해 비켜 가고, 그래도 막히면 데드락 에스컬레이션(L1~L4)이 단계적으로 해소합니다.</li>
             <li>개별 컴포넌트보다 <strong style={{ color: '#e6edf3' }}>전체 흐름의 설계</strong>가 성능 상한을 결정한다는 점은 다중 에이전트 시스템에서 자주 관찰되는 패턴입니다.</li>
             <li><strong style={{ color: '#f85149' }}>한계</strong>: 자동 디스패칭 ON, 100대 / 12×8 맵 조건의 관찰입니다. 디스패칭 OFF나 극단적 혼잡(200대+, 좁은 통로)에서는 차이가 다시 드러날 가능성이 있어 추가 벤치마크가 필요합니다.</li>
           </ul>
